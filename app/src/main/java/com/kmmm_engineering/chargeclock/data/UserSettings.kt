@@ -32,7 +32,7 @@ enum class DisplayScale(val factor: Float) {
  */
 data class UserSettings(
     val language: AppLanguage = AppLanguage.SYSTEM,
-    val idleBrightness: Float = 0.02f,
+    val idleBrightness: Float = 0.10f,
     val textColor: TextColorOption = TextColorOption.WHITE,
     val discordWebhookUrl: String = "",
     val discordDischargeThreshold: Int = -1,

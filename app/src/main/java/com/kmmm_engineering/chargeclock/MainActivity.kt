@@ -3,17 +3,19 @@ package com.kmmm_engineering.chargeclock
 import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.view.WindowManager
-import androidx.activity.ComponentActivity
-import androidx.appcompat.app.AppCompatDelegate
-import androidx.core.os.LocaleListCompat
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.core.os.LocaleListCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -30,7 +32,7 @@ import com.kmmm_engineering.chargeclock.ui.theme.ChargeClockTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
 
     private val thresholdTracker = ThresholdFireTracker()
 
@@ -43,18 +45,22 @@ class MainActivity : ComponentActivity() {
         val repo = app.settingsRepository
 
         setContent {
-            val settings by repo.settingsFlow.collectAsStateWithLifecycle(
-                initialValue = UserSettings(),
+            // null until first DataStore emission — avoid applying SYSTEM default and wiping
+            // a previously stored AppCompat locale before prefs load.
+            val settingsState = repo.settingsFlow.collectAsStateWithLifecycle(
+                initialValue = null,
             )
+            val settings = settingsState.value ?: UserSettings()
             val batteryFlow = remember { BatteryMonitor.observe(applicationContext) }
             val battery by batteryFlow.collectAsStateWithLifecycle(
                 initialValue = com.kmmm_engineering.chargeclock.battery.BatteryStatus(0, false, false),
             )
             val scope = rememberCoroutineScope()
 
-            // Apply language override
-            LaunchedEffect(settings.language) {
-                applyLanguage(settings.language)
+            // Apply language override (AppCompat per-app locales). Activity recreates on change.
+            LaunchedEffect(settingsState.value?.language) {
+                val language = settingsState.value?.language ?: return@LaunchedEffect
+                applyLanguage(language)
             }
 
             // Orientation
@@ -80,12 +86,15 @@ class MainActivity : ComponentActivity() {
             // Settings screen: null = readable (system); non-null = live idle-slider preview
             var settingsBrightnessPreview by remember { mutableStateOf<Float?>(null) }
             var showSettings by remember { mutableStateOf(false) }
+            // Anti-misoperation unlock slider visible on clock → readable brightness
+            var unlockSliderVisible by remember { mutableStateOf(false) }
 
             LaunchedEffect(
                 showSettings,
                 settingsBrightnessPreview,
                 settings.idleBrightness,
                 brightUntil,
+                unlockSliderVisible,
             ) {
                 when {
                     showSettings -> {
@@ -97,14 +106,18 @@ class MainActivity : ComponentActivity() {
                             applyWindowBrightness(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
                         }
                     }
+                    unlockSliderVisible -> {
+                        // Same idea as settings: readable while slide-to-settings is on screen
+                        applyWindowBrightness(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
+                    }
                     else -> {
                         val now = System.currentTimeMillis()
                         if (brightUntil > now) {
                             applyWindowBrightness(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
                             val remaining = brightUntil - now
                             delay(remaining)
-                            // Re-check: may have entered settings during delay
-                            if (!showSettings) {
+                            // Re-check: may have entered settings / slider during delay
+                            if (!showSettings && !unlockSliderVisible) {
                                 applyWindowBrightness(settings.idleBrightness)
                             }
                         } else {
@@ -114,9 +127,14 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Exit on unplug
+            // Exit on unplug — falling edge only (plugged → unplugged).
+            // Do NOT exit merely because the app started while already unplugged.
+            var previousPlugged by remember { mutableStateOf<Boolean?>(null) }
             LaunchedEffect(battery.isPlugged, settings.exitOnUnplug) {
-                if (settings.exitOnUnplug && !battery.isPlugged) {
+                val plugged = battery.isPlugged
+                val prev = previousPlugged
+                previousPlugged = plugged
+                if (settings.exitOnUnplug && prev == true && !plugged) {
                     finish()
                 }
             }
@@ -146,35 +164,45 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            ChargeClockTheme {
-                if (showSettings) {
-                    SettingsScreen(
-                        settings = settings,
-                        repository = repo,
-                        onBack = {
-                            settingsBrightnessPreview = null
-                            showSettings = false
-                            hideSystemBars()
-                        },
-                        onIdleBrightnessPreview = { preview ->
-                            settingsBrightnessPreview = preview
-                        },
-                    )
-                } else {
-                    ClockScreen(
-                        settings = settings,
-                        batteryPercent = battery.percent,
-                        onSingleTap = {
-                            brightUntil = System.currentTimeMillis() + 5_000L
-                        },
-                        onOpenSettings = {
-                            settingsBrightnessPreview = null
-                            showSettings = true
-                        },
-                        onHintDismissed = {
-                            scope.launch { repo.markFirstRunHintSeen() }
-                        },
-                    )
+            // Recompose strings when application locales / configuration update
+            val configuration = LocalConfiguration.current
+            val localeKey = configuration.locales.toLanguageTags() + "|" + settings.language.name
+
+            key(localeKey) {
+                ChargeClockTheme {
+                    if (showSettings) {
+                        SettingsScreen(
+                            settings = settings,
+                            repository = repo,
+                            onBack = {
+                                settingsBrightnessPreview = null
+                                showSettings = false
+                                hideSystemBars()
+                            },
+                            onIdleBrightnessPreview = { preview ->
+                                settingsBrightnessPreview = preview
+                            },
+                        )
+                    } else {
+                        ClockScreen(
+                            settings = settings,
+                            batteryPercent = battery.percent,
+                            onSingleTap = {
+                                brightUntil = System.currentTimeMillis() + 5_000L
+                            },
+                            onOpenSettings = {
+                                unlockSliderVisible = false
+                                settingsBrightnessPreview = null
+                                showSettings = true
+                            },
+                            onHintDismissed = {
+                                scope.launch { repo.markFirstRunHintSeen() }
+                            },
+                            onUnlockSliderVisibilityChange = { visible ->
+                                unlockSliderVisible = visible
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -216,6 +244,11 @@ class MainActivity : ComponentActivity() {
         } else {
             LocaleListCompat.forLanguageTags(tags)
         }
-        AppCompatDelegate.setApplicationLocales(locales)
+        val current = AppCompatDelegate.getApplicationLocales()
+        val currentTags = current.toLanguageTags()
+        val desiredTags = locales.toLanguageTags()
+        if (currentTags != desiredTags) {
+            AppCompatDelegate.setApplicationLocales(locales)
+        }
     }
 }

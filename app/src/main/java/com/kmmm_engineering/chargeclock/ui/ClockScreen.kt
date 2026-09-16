@@ -1,5 +1,6 @@
 package com.kmmm_engineering.chargeclock.ui
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -43,12 +45,15 @@ fun ClockScreen(
     onSingleTap: () -> Unit,
     onOpenSettings: () -> Unit,
     onHintDismissed: () -> Unit,
+    onUnlockSliderVisibilityChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var showSlider by remember { mutableStateOf(false) }
     var shiftX by remember { mutableIntStateOf(0) }
     var shiftY by remember { mutableIntStateOf(0) }
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     LaunchedEffect(settings.showSeconds) {
         while (true) {
@@ -68,6 +73,7 @@ fun ClockScreen(
 
     // Auto-hide slider after inactivity
     LaunchedEffect(showSlider) {
+        onUnlockSliderVisibilityChange(showSlider)
         if (showSlider) {
             delay(8_000L)
             showSlider = false
@@ -157,7 +163,8 @@ fun ClockScreen(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(horizontal = 32.dp, vertical = 40.dp)
-                    .fillMaxWidth(),
+                    // Landscape: ~half width (centered). Portrait: full width within padding.
+                    .fillMaxWidth(if (isLandscape) 0.5f else 1f),
             )
         }
     }

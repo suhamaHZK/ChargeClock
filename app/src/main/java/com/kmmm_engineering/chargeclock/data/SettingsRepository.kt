@@ -40,7 +40,7 @@ class SettingsRepository(private val context: Context) {
             language = prefs[Keys.language]?.let {
                 runCatching { AppLanguage.valueOf(it) }.getOrDefault(AppLanguage.SYSTEM)
             } ?: AppLanguage.SYSTEM,
-            idleBrightness = prefs[Keys.idleBrightness] ?: 0.02f,
+            idleBrightness = prefs[Keys.idleBrightness] ?: 0.10f,
             textColor = prefs[Keys.textColor]?.let {
                 runCatching { TextColorOption.valueOf(it) }.getOrDefault(TextColorOption.WHITE)
             } ?: TextColorOption.WHITE,
@@ -77,7 +77,7 @@ class SettingsRepository(private val context: Context) {
                 language = prefs[Keys.language]?.let {
                     runCatching { AppLanguage.valueOf(it) }.getOrDefault(AppLanguage.SYSTEM)
                 } ?: AppLanguage.SYSTEM,
-                idleBrightness = prefs[Keys.idleBrightness] ?: 0.02f,
+                idleBrightness = prefs[Keys.idleBrightness] ?: 0.10f,
                 textColor = prefs[Keys.textColor]?.let {
                     runCatching { TextColorOption.valueOf(it) }.getOrDefault(TextColorOption.WHITE)
                 } ?: TextColorOption.WHITE,

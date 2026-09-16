@@ -8,10 +8,10 @@ Fullscreen charging-oriented digital clock for Android 10+ (API 29).
 ## Features (MVP)
 
 - Immersive black fullscreen clock: date + weekday, time (seconds on by default), battery %
-- Idle window brightness with 5s brighten on single tap; settings opens at readable (system) brightness with live idle-slider preview; restore system brightness on pause
+- Idle window brightness (default ~10%) with 5s brighten on single tap; unlock-slider and settings use readable (system) brightness; live idle-slider preview in settings; restore system brightness on pause
 - OLED pixel shift every few minutes
-- Double-tap → rounded slide-to-settings (EN: `Slide to settings >>` / JA: `スライドで設定 >>`)
-- Settings via DataStore (language, brightness, text color, Discord webhook/thresholds as dropdowns, landscape, scale, 12/24, seconds, date format dropdown, month/weekday labels, exit on unplug, auto-sleep)
+- Double-tap → rounded slide-to-settings (EN: `Slide to settings >>` / JA: `スライドで設定 >>`); landscape track ~half width
+- Settings via DataStore (per-app language via AppCompat locales, brightness, text color, Discord webhook/thresholds as dropdowns, landscape, scale, 12/24, seconds, date format dropdown, month/weekday labels without brackets, exit on unplug = falling-edge only, auto-sleep)
 - Discord webhook notification once per threshold crossing
 - No ads, no IAP
 - **Not in MVP:** auto-start on plug-in

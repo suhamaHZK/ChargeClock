@@ -25,11 +25,11 @@
     <string name="show_seconds">Show seconds</string>
     <string name="date_format">Date format</string>
     <string name="month_format">Month format</string>
-    <string name="month_numeric">[数字]</string>
-    <string name="month_abbr">[Jan,Feb,…]</string>
+    <string name="month_numeric">数字</string>
+    <string name="month_abbr">Jan,Feb,…</string>
     <string name="weekday_format">Weekday format</string>
-    <string name="weekday_en">[Mon,Tue,…]</string>
-    <string name="weekday_ja">[月,火,…]</string>
+    <string name="weekday_en">Mon,Tue,…</string>
+    <string name="weekday_ja">月,火,…</string>
     <string name="exit_on_unplug">Exit when charger unplugged</string>
     <string name="allow_auto_sleep">Allow auto-sleep while running</string>
     <string name="on">On</string>
