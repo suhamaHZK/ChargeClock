@@ -52,7 +52,7 @@ fun UnlockSlider(
             .clip(shape)
             .background(
                 Brush.horizontalGradient(
-                    listOf(Color(0xFF1A1A1A), Color(0xFF0D0D0D))
+                    listOf(Color(0xFF3A3A3A), Color(0xFF2A2A2A))
                 )
             )
             .padding(horizontal = 4.dp, vertical = 4.dp),
@@ -62,7 +62,7 @@ fun UnlockSlider(
 
         Text(
             text = stringResource(R.string.slide_to_settings),
-            color = Color(0xFF888888),
+            color = Color(0xFFBBBBBB),
             fontSize = 13.sp,
             modifier = Modifier.align(Alignment.Center),
         )

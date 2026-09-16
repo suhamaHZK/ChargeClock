@@ -1,11 +1,21 @@
 package com.kmmm_engineering.chargeclock.util
 
+import com.kmmm_engineering.chargeclock.data.AppLanguage
 import com.kmmm_engineering.chargeclock.data.DateFormatOption
 import com.kmmm_engineering.chargeclock.data.MonthFormatOption
 import com.kmmm_engineering.chargeclock.data.UserSettings
 import com.kmmm_engineering.chargeclock.data.WeekdayFormatOption
 import java.util.Calendar
 import java.util.Locale
+
+data class TimeParts(
+    /** Hours and minutes, e.g. "13:45" or "1:45". */
+    val hourMinute: String,
+    /** Seconds digits only, e.g. "07", or null when seconds are hidden. */
+    val seconds: String?,
+    /** "AM" / "PM", or null in 24-hour mode. */
+    val amPm: String?,
+)
 
 object Formatters {
     private val monthAbbr = arrayOf(
@@ -46,7 +56,7 @@ object Formatters {
         return "$datePart  $weekday"
     }
 
-    fun formatTime(cal: Calendar, settings: UserSettings): String {
+    fun formatTimeParts(cal: Calendar, settings: UserSettings): TimeParts {
         val h24 = cal.get(Calendar.HOUR_OF_DAY)
         val min = cal.get(Calendar.MINUTE)
         val sec = cal.get(Calendar.SECOND)
@@ -56,27 +66,36 @@ object Formatters {
             val h12 = cal.get(Calendar.HOUR)
             if (h12 == 0) 12 else h12
         }
-        val base = if (settings.use24Hour) {
+        val hourMinute = if (settings.use24Hour) {
             "%02d:%02d".format(hour, min)
         } else {
-            val amPm = if (cal.get(Calendar.AM_PM) == Calendar.AM) "AM" else "PM"
-            "%d:%02d %s".format(hour, min, amPm)
+            "%d:%02d".format(hour, min)
         }
-        return if (settings.showSeconds) {
-            if (settings.use24Hour) {
-                "%02d:%02d:%02d".format(hour, min, sec)
-            } else {
-                val amPm = if (cal.get(Calendar.AM_PM) == Calendar.AM) "AM" else "PM"
-                "%d:%02d:%02d %s".format(hour, min, sec, amPm)
-            }
+        val seconds = if (settings.showSeconds) "%02d".format(sec) else null
+        val amPm = if (settings.use24Hour) {
+            null
+        } else if (cal.get(Calendar.AM_PM) == Calendar.AM) {
+            "AM"
         } else {
-            base
+            "PM"
         }
+        return TimeParts(hourMinute = hourMinute, seconds = seconds, amPm = amPm)
+    }
+
+    /** Single-line time string (settings previews / Discord-style uses). */
+    fun formatTime(cal: Calendar, settings: UserSettings): String {
+        val parts = formatTimeParts(cal, settings)
+        val core = if (parts.seconds != null) {
+            "${parts.hourMinute}:${parts.seconds}"
+        } else {
+            parts.hourMinute
+        }
+        return if (parts.amPm != null) "$core ${parts.amPm}" else core
     }
 
     fun resolveLocale(settings: UserSettings, system: Locale): Locale = when (settings.language) {
-        com.kmmm_engineering.chargeclock.data.AppLanguage.SYSTEM -> system
-        com.kmmm_engineering.chargeclock.data.AppLanguage.ENGLISH -> Locale.ENGLISH
-        com.kmmm_engineering.chargeclock.data.AppLanguage.JAPANESE -> Locale.JAPANESE
+        AppLanguage.SYSTEM -> system
+        AppLanguage.ENGLISH -> Locale.ENGLISH
+        AppLanguage.JAPANESE -> Locale.JAPANESE
     }
 }
