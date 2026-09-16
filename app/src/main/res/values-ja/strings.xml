@@ -30,7 +30,7 @@
     <string name="weekday_format">曜日の形式</string>
     <string name="weekday_en">Mon,Tue,…</string>
     <string name="weekday_ja">月,火,…</string>
-    <string name="weekday_tw">週一,週二,…</string>
+    <string name="weekday_tw">星期一,星期二,…</string>
     <string name="weekday_cn">周一,周二,…</string>
     <string name="exit_on_unplug">充電器を外したら自動終了</string>
     <string name="allow_auto_sleep">起動中の自動スリープ</string>

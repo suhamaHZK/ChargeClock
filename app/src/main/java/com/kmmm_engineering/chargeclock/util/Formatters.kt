@@ -24,7 +24,7 @@ object Formatters {
     )
     private val weekdayEn = arrayOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
     private val weekdayJa = arrayOf("日", "月", "火", "水", "木", "金", "土")
-    private val weekdayTw = arrayOf("週日", "週一", "週二", "週三", "週四", "週五", "週六")
+    private val weekdayTw = arrayOf("星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六")
     private val weekdayCn = arrayOf("周日", "周一", "周二", "周三", "周四", "周五", "周六")
 
     fun formatDate(cal: Calendar, settings: UserSettings): String {
