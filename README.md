@@ -45,7 +45,7 @@ AGP 8.7.3, Kotlin 2.0.21, Compose BOM 2024.10.01, DataStore Preferences, Materia
 
 ## Design
 
-See `design/REQUIREMENTS.md` and `design/unlock-slider.svg`.
+See `design/REQUIREMENTS.md`, `design/unlock-slider.svg`, and `design/battery-ui-sketch.svg`.
 
 ## License
 

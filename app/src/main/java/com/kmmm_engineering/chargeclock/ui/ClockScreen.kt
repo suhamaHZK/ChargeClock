@@ -1,7 +1,9 @@
 package com.kmmm_engineering.chargeclock.ui
 
 import android.content.res.Configuration
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,11 +29,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -48,6 +55,7 @@ import kotlin.random.Random
 fun ClockScreen(
     settings: UserSettings,
     batteryPercent: Int,
+    isCharging: Boolean,
     onSingleTap: () -> Unit,
     onOpenSettings: () -> Unit,
     onHintDismissed: () -> Unit,
@@ -140,14 +148,11 @@ fun ClockScreen(
                 textColor = textColor,
             )
             Spacer(Modifier.height(12.dp))
-            Text(
-                text = stringResource(R.string.battery_percent, batteryPercent),
-                color = textColor,
-                fontSize = (36 * scale).sp,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                softWrap = false,
+            BatteryStatusBlock(
+                percent = batteryPercent,
+                isCharging = isCharging,
+                textColor = textColor,
+                scale = scale,
             )
         }
 
@@ -315,6 +320,107 @@ private fun TimeDigitsRow(
                 maxLines = 1,
                 softWrap = false,
                 letterSpacing = 1.sp,
+            )
+        }
+    }
+}
+
+
+/** floor(level/10) filled; 100% → 10 filled; 0–9% → 0 filled. */
+internal fun batteryFilledBlocks(percent: Int): Int {
+    val level = percent.coerceIn(0, 100)
+    return if (level >= 100) 10 else level / 10
+}
+
+@Composable
+private fun BatteryStatusBlock(
+    percent: Int,
+    isCharging: Boolean,
+    textColor: Color,
+    scale: Float,
+) {
+    val percentLabel = stringResource(R.string.battery_percent, percent)
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            if (isCharging) {
+                LightningBoltIcon(
+                    color = textColor,
+                    modifier = Modifier
+                        .size((22 * scale).dp)
+                        .semantics { contentDescription = "charging" },
+                )
+                Spacer(Modifier.width((6 * scale).dp))
+            }
+            Text(
+                text = percentLabel,
+                color = textColor,
+                fontSize = (36 * scale).sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
+        Spacer(Modifier.height((10 * scale).dp))
+        BatteryBlocksRow(
+            percent = percent,
+            color = textColor,
+            scale = scale,
+        )
+    }
+}
+
+@Composable
+private fun LightningBoltIcon(
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val bolt = Path().apply {
+            moveTo(w * 0.58f, 0f)
+            lineTo(w * 0.18f, h * 0.55f)
+            lineTo(w * 0.46f, h * 0.55f)
+            lineTo(w * 0.38f, h)
+            lineTo(w * 0.86f, h * 0.40f)
+            lineTo(w * 0.52f, h * 0.40f)
+            close()
+        }
+        drawPath(bolt, color)
+    }
+}
+
+@Composable
+private fun BatteryBlocksRow(
+    percent: Int,
+    color: Color,
+    scale: Float,
+) {
+    val filled = batteryFilledBlocks(percent)
+    val blockW: Dp = (16 * scale).dp
+    val blockH: Dp = (28 * scale).dp
+    val gap: Dp = (5 * scale).dp
+    val stroke: Dp = (1.5f * scale).coerceAtLeast(1f).dp
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(gap),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(10) { index ->
+            val solid = index < filled
+            Box(
+                modifier = Modifier
+                    .size(width = blockW, height = blockH)
+                    .then(
+                        if (solid) {
+                            Modifier.background(color)
+                        } else {
+                            Modifier.border(width = stroke, color = color)
+                        }
+                    ),
             )
         }
     }

@@ -187,6 +187,7 @@ class MainActivity : AppCompatActivity() {
                         ClockScreen(
                             settings = settings,
                             batteryPercent = battery.percent,
+                            isCharging = battery.isCharging,
                             onSingleTap = {
                                 brightUntil = System.currentTimeMillis() + 5_000L
                             },
