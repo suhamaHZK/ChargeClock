@@ -18,11 +18,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -60,6 +64,7 @@ fun SettingsScreen(
     settings: UserSettings,
     repository: SettingsRepository,
     onBack: () -> Unit,
+    onIdleBrightnessPreview: (Float?) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     var webhookDraft by remember(settings.discordWebhookUrl) {
@@ -112,7 +117,13 @@ fun SettingsScreen(
             )
             Slider(
                 value = settings.idleBrightness,
-                onValueChange = { v -> scope.launch { repository.setIdleBrightness(v) } },
+                onValueChange = { v ->
+                    onIdleBrightnessPreview(v)
+                    scope.launch { repository.setIdleBrightness(v) }
+                },
+                onValueChangeFinished = {
+                    onIdleBrightnessPreview(null)
+                },
                 valueRange = 0.01f..0.35f,
             )
 
@@ -147,12 +158,12 @@ fun SettingsScreen(
             )
 
             SectionTitle(stringResource(R.string.discord_discharge))
-            ThresholdChips(settings.discordDischargeThreshold) { v ->
+            ThresholdDropdown(settings.discordDischargeThreshold) { v ->
                 scope.launch { repository.setDiscordDischarge(v) }
             }
 
             SectionTitle(stringResource(R.string.discord_charge))
-            ThresholdChips(settings.discordChargeThreshold) { v ->
+            ThresholdDropdown(settings.discordChargeThreshold) { v ->
                 scope.launch { repository.setDiscordCharge(v) }
             }
 
@@ -202,17 +213,22 @@ fun SettingsScreen(
             )
 
             SectionTitle(stringResource(R.string.date_format))
-            ChipRow {
-                LangChip("YYYY/MM/DD", settings.dateFormat == DateFormatOption.YMD) {
-                    scope.launch { repository.setDateFormat(DateFormatOption.YMD) }
-                }
-                LangChip("MM/DD/YYYY", settings.dateFormat == DateFormatOption.MDY) {
-                    scope.launch { repository.setDateFormat(DateFormatOption.MDY) }
-                }
-                LangChip("DD/MM/YYYY", settings.dateFormat == DateFormatOption.DMY) {
-                    scope.launch { repository.setDateFormat(DateFormatOption.DMY) }
-                }
-            }
+            SimpleDropdown(
+                options = listOf(
+                    DateFormatOption.YMD to "YYYY/MM/DD",
+                    DateFormatOption.MDY to "MM/DD/YYYY",
+                    DateFormatOption.DMY to "DD/MM/YYYY",
+                ),
+                selected = settings.dateFormat,
+                labelOf = { opt ->
+                    when (opt) {
+                        DateFormatOption.YMD -> "YYYY/MM/DD"
+                        DateFormatOption.MDY -> "MM/DD/YYYY"
+                        DateFormatOption.DMY -> "DD/MM/YYYY"
+                    }
+                },
+                onSelect = { opt -> scope.launch { repository.setDateFormat(opt) } },
+            )
 
             SectionTitle(stringResource(R.string.month_format))
             ChipRow {
@@ -280,20 +296,56 @@ private fun LangChip(label: String, selected: Boolean, onClick: () -> Unit) {
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ThresholdChips(current: Int, onSelect: (Int) -> Unit) {
-    val options = listOf(-1) + (5..100 step 5).toList()
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        options.chunked(6).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                row.forEach { v ->
-                    val label = if (v < 0) stringResource(R.string.threshold_off) else "$v%"
-                    FilterChip(
-                        selected = current == v,
-                        onClick = { onSelect(v) },
-                        label = { Text(label) },
-                    )
-                }
+private fun ThresholdDropdown(current: Int, onSelect: (Int) -> Unit) {
+    val offLabel = stringResource(R.string.threshold_off)
+    val options = remember { listOf(-1) + (5..100 step 5).toList() }
+    val labelOf: (Int) -> String = { v -> if (v < 0) offLabel else "$v%" }
+    SimpleDropdown(
+        options = options.map { it to labelOf(it) },
+        selected = current,
+        labelOf = { labelOf(it) },
+        onSelect = onSelect,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun <T> SimpleDropdown(
+    options: List<Pair<T, String>>,
+    selected: T,
+    labelOf: (T) -> String,
+    onSelect: (T) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        OutlinedTextField(
+            value = labelOf(selected),
+            onValueChange = {},
+            readOnly = true,
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                .fillMaxWidth(),
+            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            options.forEach { (value, label) ->
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    onClick = {
+                        onSelect(value)
+                        expanded = false
+                    },
+                )
             }
         }
     }

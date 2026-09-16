@@ -25,11 +25,11 @@
     <string name="show_seconds">秒の表示</string>
     <string name="date_format">日付形式</string>
     <string name="month_format">月の形式</string>
-    <string name="month_numeric">01等</string>
-    <string name="month_abbr">Jan等</string>
+    <string name="month_numeric">[数字]</string>
+    <string name="month_abbr">[Jan,Feb,…]</string>
     <string name="weekday_format">曜日の形式</string>
-    <string name="weekday_en">Mon等</string>
-    <string name="weekday_ja">月等</string>
+    <string name="weekday_en">[Mon,Tue,…]</string>
+    <string name="weekday_ja">[月,火,…]</string>
     <string name="exit_on_unplug">充電器を外したら自動終了</string>
     <string name="allow_auto_sleep">起動中の自動スリープ</string>
     <string name="on">オン</string>

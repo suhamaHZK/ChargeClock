@@ -75,18 +75,42 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Idle brightness on start / resume path handled below via brighten state
+            // Clock-screen temporary brighten (single tap)
             var brightUntil by remember { mutableStateOf(0L) }
+            // Settings screen: null = readable (system); non-null = live idle-slider preview
+            var settingsBrightnessPreview by remember { mutableStateOf<Float?>(null) }
+            var showSettings by remember { mutableStateOf(false) }
 
-            LaunchedEffect(settings.idleBrightness, brightUntil) {
-                val now = System.currentTimeMillis()
-                if (brightUntil > now) {
-                    applyWindowBrightness(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
-                    val remaining = brightUntil - now
-                    delay(remaining)
-                    applyWindowBrightness(settings.idleBrightness)
-                } else {
-                    applyWindowBrightness(settings.idleBrightness)
+            LaunchedEffect(
+                showSettings,
+                settingsBrightnessPreview,
+                settings.idleBrightness,
+                brightUntil,
+            ) {
+                when {
+                    showSettings -> {
+                        val preview = settingsBrightnessPreview
+                        if (preview != null) {
+                            applyWindowBrightness(preview)
+                        } else {
+                            // Readable settings: system brightness (not ultra-dim idle)
+                            applyWindowBrightness(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
+                        }
+                    }
+                    else -> {
+                        val now = System.currentTimeMillis()
+                        if (brightUntil > now) {
+                            applyWindowBrightness(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
+                            val remaining = brightUntil - now
+                            delay(remaining)
+                            // Re-check: may have entered settings during delay
+                            if (!showSettings) {
+                                applyWindowBrightness(settings.idleBrightness)
+                            }
+                        } else {
+                            applyWindowBrightness(settings.idleBrightness)
+                        }
+                    }
                 }
             }
 
@@ -123,15 +147,17 @@ class MainActivity : ComponentActivity() {
             }
 
             ChargeClockTheme {
-                // Two-screen app: simple state instead of navigation-compose
-                var showSettings by remember { mutableStateOf(false) }
                 if (showSettings) {
                     SettingsScreen(
                         settings = settings,
                         repository = repo,
                         onBack = {
+                            settingsBrightnessPreview = null
                             showSettings = false
                             hideSystemBars()
+                        },
+                        onIdleBrightnessPreview = { preview ->
+                            settingsBrightnessPreview = preview
                         },
                     )
                 } else {
@@ -141,7 +167,10 @@ class MainActivity : ComponentActivity() {
                         onSingleTap = {
                             brightUntil = System.currentTimeMillis() + 5_000L
                         },
-                        onOpenSettings = { showSettings = true },
+                        onOpenSettings = {
+                            settingsBrightnessPreview = null
+                            showSettings = true
+                        },
                         onHintDismissed = {
                             scope.launch { repo.markFirstRunHintSeen() }
                         },
