@@ -24,6 +24,8 @@ object Formatters {
     )
     private val weekdayEn = arrayOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
     private val weekdayJa = arrayOf("日", "月", "火", "水", "木", "金", "土")
+    private val weekdayTw = arrayOf("週日", "週一", "週二", "週三", "週四", "週五", "週六")
+    private val weekdayCn = arrayOf("周日", "周一", "周二", "周三", "周四", "周五", "周六")
 
     fun formatDate(cal: Calendar, settings: UserSettings): String {
         val y = cal.get(Calendar.YEAR)
@@ -52,6 +54,8 @@ object Formatters {
         val weekday = when (settings.weekdayFormat) {
             WeekdayFormatOption.EN -> weekdayEn[wd]
             WeekdayFormatOption.JA -> weekdayJa[wd]
+            WeekdayFormatOption.TW -> weekdayTw[wd]
+            WeekdayFormatOption.CN -> weekdayCn[wd]
         }
         return "$datePart  $weekday"
     }

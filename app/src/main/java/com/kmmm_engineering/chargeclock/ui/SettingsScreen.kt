@@ -241,14 +241,28 @@ fun SettingsScreen(
             }
 
             SectionTitle(stringResource(R.string.weekday_format))
-            ChipRow {
-                LangChip(stringResource(R.string.weekday_en), settings.weekdayFormat == WeekdayFormatOption.EN) {
-                    scope.launch { repository.setWeekdayFormat(WeekdayFormatOption.EN) }
-                }
-                LangChip(stringResource(R.string.weekday_ja), settings.weekdayFormat == WeekdayFormatOption.JA) {
-                    scope.launch { repository.setWeekdayFormat(WeekdayFormatOption.JA) }
-                }
-            }
+            val weekdayEn = stringResource(R.string.weekday_en)
+            val weekdayJa = stringResource(R.string.weekday_ja)
+            val weekdayTw = stringResource(R.string.weekday_tw)
+            val weekdayCn = stringResource(R.string.weekday_cn)
+            SimpleDropdown(
+                options = listOf(
+                    WeekdayFormatOption.EN to weekdayEn,
+                    WeekdayFormatOption.JA to weekdayJa,
+                    WeekdayFormatOption.TW to weekdayTw,
+                    WeekdayFormatOption.CN to weekdayCn,
+                ),
+                selected = settings.weekdayFormat,
+                labelOf = { opt ->
+                    when (opt) {
+                        WeekdayFormatOption.EN -> weekdayEn
+                        WeekdayFormatOption.JA -> weekdayJa
+                        WeekdayFormatOption.TW -> weekdayTw
+                        WeekdayFormatOption.CN -> weekdayCn
+                    }
+                },
+                onSelect = { opt -> scope.launch { repository.setWeekdayFormat(opt) } },
+            )
 
             SwitchRow(
                 label = stringResource(R.string.exit_on_unplug),

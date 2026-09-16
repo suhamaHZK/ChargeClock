@@ -8,7 +8,7 @@ enum class DateFormatOption { YMD, MDY, DMY }
 
 enum class MonthFormatOption { NUMERIC, ABBR }
 
-enum class WeekdayFormatOption { EN, JA }
+enum class WeekdayFormatOption { EN, JA, TW, CN }
 
 enum class TextColorOption(val argb: Long) {
     WHITE(0xFFFFFFFF),

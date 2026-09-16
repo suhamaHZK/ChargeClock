@@ -30,6 +30,8 @@
     <string name="weekday_format">Weekday format</string>
     <string name="weekday_en">Mon,Tue,…</string>
     <string name="weekday_ja">月,火,…</string>
+    <string name="weekday_tw">週一,週二,…</string>
+    <string name="weekday_cn">周一,周二,…</string>
     <string name="exit_on_unplug">Exit when charger unplugged</string>
     <string name="allow_auto_sleep">Allow auto-sleep while running</string>
     <string name="on">On</string>
