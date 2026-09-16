@@ -3,7 +3,6 @@ package com.kmmm_engineering.chargeclock.ui
 import android.content.res.Configuration
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +29,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
@@ -405,23 +408,34 @@ private fun BatteryBlocksRow(
     val blockH: Dp = (28 * scale).dp
     val gap: Dp = (5 * scale).dp
     val stroke: Dp = (1.5f * scale).coerceAtLeast(1f).dp
+    // Slight round (~2.5dp * scale ≈ 15% of block width) — vector Canvas, not glyphs.
+    val corner: Dp = (2.5f * scale).dp
     Row(
         horizontalArrangement = Arrangement.spacedBy(gap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         repeat(10) { index ->
             val solid = index < filled
-            Box(
-                modifier = Modifier
-                    .size(width = blockW, height = blockH)
-                    .then(
-                        if (solid) {
-                            Modifier.background(color)
-                        } else {
-                            Modifier.border(width = stroke, color = color)
-                        }
-                    ),
-            )
+            Canvas(modifier = Modifier.size(width = blockW, height = blockH)) {
+                val cornerPx = corner.toPx()
+                val radii = CornerRadius(cornerPx, cornerPx)
+                if (solid) {
+                    drawRoundRect(
+                        color = color,
+                        cornerRadius = radii,
+                    )
+                } else {
+                    val strokePx = stroke.toPx()
+                    val inset = strokePx / 2f
+                    drawRoundRect(
+                        color = color,
+                        topLeft = Offset(inset, inset),
+                        size = Size(this.size.width - strokePx, this.size.height - strokePx),
+                        cornerRadius = radii,
+                        style = Stroke(width = strokePx),
+                    )
+                }
+            }
         }
     }
 }
