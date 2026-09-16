@@ -8,22 +8,16 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 import com.kmmm_engineering.chargeclock.battery.BatteryMonitor
 import com.kmmm_engineering.chargeclock.data.AppLanguage
 import com.kmmm_engineering.chargeclock.data.LandscapeMode
@@ -129,35 +123,29 @@ class MainActivity : ComponentActivity() {
             }
 
             ChargeClockTheme {
-                val nav = rememberNavController()
-                NavHost(
-                    navController = nav,
-                    startDestination = "clock",
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    composable("clock") {
-                        ClockScreen(
-                            settings = settings,
-                            batteryPercent = battery.percent,
-                            onSingleTap = {
-                                brightUntil = System.currentTimeMillis() + 5_000L
-                            },
-                            onOpenSettings = { nav.navigate("settings") },
-                            onHintDismissed = {
-                                scope.launch { repo.markFirstRunHintSeen() }
-                            },
-                        )
-                    }
-                    composable("settings") {
-                        SettingsScreen(
-                            settings = settings,
-                            repository = repo,
-                            onBack = {
-                                nav.popBackStack()
-                                hideSystemBars()
-                            },
-                        )
-                    }
+                // Two-screen app: simple state instead of navigation-compose
+                var showSettings by remember { mutableStateOf(false) }
+                if (showSettings) {
+                    SettingsScreen(
+                        settings = settings,
+                        repository = repo,
+                        onBack = {
+                            showSettings = false
+                            hideSystemBars()
+                        },
+                    )
+                } else {
+                    ClockScreen(
+                        settings = settings,
+                        batteryPercent = battery.percent,
+                        onSingleTap = {
+                            brightUntil = System.currentTimeMillis() + 5_000L
+                        },
+                        onOpenSettings = { showSettings = true },
+                        onHintDismissed = {
+                            scope.launch { repo.markFirstRunHintSeen() }
+                        },
+                    )
                 }
             }
         }

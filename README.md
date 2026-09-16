@@ -20,16 +20,28 @@ Fullscreen charging-oriented digital clock for Android 10+ (API 29).
 
 ```bash
 export ANDROID_HOME=/workspace/Android/Sdk
-./gradlew :app:assembleDebug
+./gradlew :app:assembleRelease
 ```
 
-APK: `app/build/outputs/apk/debug/app-debug.apk`
+Release APK (R8 minify + resource shrink, arm64-v8a / armeabi-v7a):  
+`app/build/outputs/apk/release/app-release-unsigned.apk`
+
+Debug (unminified, larger): `./gradlew :app:assembleDebug`
 
 Requires JDK 17+ and Android SDK 35.
 
+## Typical APK size
+
+After dropping `material-icons-extended`, removing unused Navigation/ViewModel deps, and enabling R8:
+
+- **Release (minified):** typically **~3–6 MB** (Compose + Material3 baseline; not comparable to ~200 KB classic View apps)
+- **Debug (unminified):** previously ~58 MB mainly due to `material-icons-extended` and unshrunk DEX
+
+A ~200 KB “Battery Clock” style app usually uses the Android View system without Compose. Jetpack Compose + Material3 alone commonly add multiple MB even with aggressive R8.
+
 ## Stack
 
-Mirrors Plain Editor: AGP 8.7.3, Kotlin 2.0.21, Compose BOM 2024.10.01, DataStore Preferences, Material3.
+AGP 8.7.3, Kotlin 2.0.21, Compose BOM 2024.10.01, DataStore Preferences, Material3, material-icons-core (not extended).
 
 ## Design
 
