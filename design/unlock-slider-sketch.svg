@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="56" viewBox="0 0 320 56" role="img" aria-label="スライダー概形 [[→] ]">
+  <rect x="1" y="1" width="318" height="54" rx="8" fill="#000" stroke="#fff" stroke-width="2"/>
+  <rect x="8" y="8" width="64" height="40" rx="6" fill="#fff"/>
+  <path d="M28 28 h24 M42 18 l14 10-14 10" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
