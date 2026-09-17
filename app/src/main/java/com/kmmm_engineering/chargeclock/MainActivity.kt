@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -19,6 +20,9 @@ import androidx.core.os.LocaleListCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kmmm_engineering.chargeclock.battery.BatteryMonitor
 import com.kmmm_engineering.chargeclock.data.AppLanguage
@@ -90,13 +94,36 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // Clock-screen temporary brighten (single tap)
+            // Clock-screen temporary brighten (single tap) + idle interaction clock
             var brightUntil by remember { mutableStateOf(0L) }
+            var lastInteractionAt by remember { mutableStateOf(System.currentTimeMillis()) }
             // Settings screen: null = readable (system); non-null = live idle-slider preview
             var settingsBrightnessPreview by remember { mutableStateOf<Float?>(null) }
             var showSettings by remember { mutableStateOf(false) }
             // Anti-misoperation unlock slider visible on clock → readable brightness
             var unlockSliderVisible by remember { mutableStateOf(false) }
+            // Only poll while resumed so onPause system-brightness restore is not fought
+            var activityResumed by remember { mutableStateOf(true) }
+            val lifecycleOwner = LocalLifecycleOwner.current
+            DisposableEffect(lifecycleOwner) {
+                val observer = LifecycleEventObserver { _, event ->
+                    when (event) {
+                        Lifecycle.Event.ON_RESUME -> activityResumed = true
+                        Lifecycle.Event.ON_PAUSE -> activityResumed = false
+                        else -> Unit
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+            }
+
+            fun markInteraction(brightenMs: Long = 0L) {
+                val now = System.currentTimeMillis()
+                lastInteractionAt = now
+                if (brightenMs > 0L) {
+                    brightUntil = now + brightenMs
+                }
+            }
 
             LaunchedEffect(
                 showSettings,
@@ -133,6 +160,30 @@ class MainActivity : AppCompatActivity() {
                             applyWindowBrightness(settings.idleBrightness)
                         }
                     }
+                }
+            }
+
+            // Periodic idle-dim enforcement after resume / external brightness resets.
+            // Skips while settings or unlock slider visible; respects 5s tap-to-brighten.
+            LaunchedEffect(activityResumed, settings.idleBrightness) {
+                if (!activityResumed) return@LaunchedEffect
+                while (true) {
+                    if (!showSettings && !unlockSliderVisible) {
+                        val now = System.currentTimeMillis()
+                        val idleDeadline = maxOf(lastInteractionAt + 5_000L, brightUntil)
+                        if (now >= idleDeadline) {
+                            val current = window.attributes.screenBrightness
+                            val idle = settings.idleBrightness
+                            val needsDim =
+                                current == WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE ||
+                                    current < 0f ||
+                                    current > idle + 0.005f
+                            if (needsDim) {
+                                applyWindowBrightness(idle)
+                            }
+                        }
+                    }
+                    delay(1_000L)
                 }
             }
 
@@ -197,6 +248,7 @@ class MainActivity : AppCompatActivity() {
                             onBack = {
                                 settingsBrightnessPreview = null
                                 showSettings = false
+                                markInteraction()
                                 hideSystemBars()
                             },
                             onIdleBrightnessPreview = { preview ->
@@ -209,9 +261,10 @@ class MainActivity : AppCompatActivity() {
                             batteryPercent = battery.percent,
                             isCharging = battery.isCharging,
                             onSingleTap = {
-                                brightUntil = System.currentTimeMillis() + 5_000L
+                                markInteraction(brightenMs = 5_000L)
                             },
                             onOpenSettings = {
+                                markInteraction()
                                 unlockSliderVisible = false
                                 settingsBrightnessPreview = null
                                 showSettings = true
@@ -220,6 +273,7 @@ class MainActivity : AppCompatActivity() {
                                 scope.launch { repo.markFirstRunHintSeen() }
                             },
                             onUnlockSliderVisibilityChange = { visible ->
+                                if (visible) markInteraction()
                                 unlockSliderVisible = visible
                             },
                         )

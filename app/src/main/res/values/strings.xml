@@ -11,6 +11,11 @@
     <string name="idle_brightness">Idle brightness</string>
     <string name="text_color">Text color</string>
     <string name="discord_webhook">Discord webhook URL</string>
+    <string name="discord_test_send">Send test Discord message</string>
+    <string name="discord_test_msg">Charge Clock test message</string>
+    <string name="discord_test_empty">Enter a webhook URL first</string>
+    <string name="discord_test_ok">Test message sent</string>
+    <string name="discord_test_fail">Test message failed</string>
     <string name="discord_discharge">Discord alert (notify when discharging falls to)</string>
     <string name="discord_charge">Discord alert (notify when charging recovers to)</string>
     <string name="threshold_off">OFF</string>

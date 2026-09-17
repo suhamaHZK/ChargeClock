@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -30,6 +31,8 @@ import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -56,6 +59,7 @@ import com.kmmm_engineering.chargeclock.data.SettingsRepository
 import com.kmmm_engineering.chargeclock.data.TextColorOption
 import com.kmmm_engineering.chargeclock.data.UserSettings
 import com.kmmm_engineering.chargeclock.data.WeekdayFormatOption
+import com.kmmm_engineering.chargeclock.discord.DiscordNotifier
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,11 +71,18 @@ fun SettingsScreen(
     onIdleBrightnessPreview: (Float?) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     var webhookDraft by remember(settings.discordWebhookUrl) {
         mutableStateOf(settings.discordWebhookUrl)
     }
+    var testSending by remember { mutableStateOf(false) }
+    val testEmptyMsg = stringResource(R.string.discord_test_empty)
+    val testOkMsg = stringResource(R.string.discord_test_ok)
+    val testFailMsg = stringResource(R.string.discord_test_fail)
+    val testContent = stringResource(R.string.discord_test_msg)
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings_title)) },
@@ -156,6 +167,26 @@ fun SettingsScreen(
                 singleLine = true,
                 placeholder = { Text("https://discord.com/api/webhooks/…") },
             )
+            Button(
+                onClick = {
+                    val url = webhookDraft.trim().ifEmpty { settings.discordWebhookUrl.trim() }
+                    if (url.isEmpty()) {
+                        scope.launch { snackbarHostState.showSnackbar(testEmptyMsg) }
+                        return@Button
+                    }
+                    if (testSending) return@Button
+                    testSending = true
+                    scope.launch {
+                        val ok = DiscordNotifier.send(url, testContent)
+                        snackbarHostState.showSnackbar(if (ok) testOkMsg else testFailMsg)
+                        testSending = false
+                    }
+                },
+                enabled = !testSending,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.discord_test_send))
+            }
 
             SectionTitle(stringResource(R.string.discord_discharge))
             ThresholdDropdown(settings.discordDischargeThreshold) { v ->

@@ -11,6 +11,11 @@
     <string name="idle_brightness">待機時の輝度</string>
     <string name="text_color">文字色</string>
     <string name="discord_webhook">Discord Webhook URL</string>
+    <string name="discord_test_send">Discordテスト送信</string>
+    <string name="discord_test_msg">充電時計のテストメッセージ</string>
+    <string name="discord_test_empty">先にWebhook URLを入力してください</string>
+    <string name="discord_test_ok">テストメッセージを送信しました</string>
+    <string name="discord_test_fail">テストメッセージの送信に失敗しました</string>
     <string name="discord_discharge">Discord通知（放電中に下記まで減少したら通知）</string>
     <string name="discord_charge">Discord通知（充電中に下記まで回復したら通知）</string>
     <string name="threshold_off">OFF</string>
