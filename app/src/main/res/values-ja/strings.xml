@@ -11,8 +11,8 @@
     <string name="idle_brightness">待機時の輝度</string>
     <string name="text_color">文字色</string>
     <string name="discord_webhook">Discord Webhook URL</string>
-    <string name="discord_discharge">Discord通知（放電中）</string>
-    <string name="discord_charge">Discord通知（充電中）</string>
+    <string name="discord_discharge">Discord通知（放電中に下記まで減少したら通知）</string>
+    <string name="discord_charge">Discord通知（充電中に下記まで回復したら通知）</string>
     <string name="threshold_off">OFF</string>
     <string name="force_landscape">強制横表示</string>
     <string name="landscape_off">OFF</string>

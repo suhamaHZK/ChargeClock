@@ -11,8 +11,8 @@
     <string name="idle_brightness">Idle brightness</string>
     <string name="text_color">Text color</string>
     <string name="discord_webhook">Discord webhook URL</string>
-    <string name="discord_discharge">Discord notify (discharging)</string>
-    <string name="discord_charge">Discord notify (charging)</string>
+    <string name="discord_discharge">Discord alert (notify when discharging falls to)</string>
+    <string name="discord_charge">Discord alert (notify when charging recovers to)</string>
     <string name="threshold_off">OFF</string>
     <string name="force_landscape">Force landscape</string>
     <string name="landscape_off">OFF</string>

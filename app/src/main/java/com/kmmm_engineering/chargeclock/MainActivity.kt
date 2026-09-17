@@ -52,10 +52,19 @@ class MainActivity : AppCompatActivity() {
             )
             val settings = settingsState.value ?: UserSettings()
             val batteryFlow = remember { BatteryMonitor.observe(applicationContext) }
-            val battery by batteryFlow.collectAsStateWithLifecycle(
-                initialValue = com.kmmm_engineering.chargeclock.battery.BatteryStatus(0, false, false),
+            val batteryState = batteryFlow.collectAsStateWithLifecycle(
+                initialValue = null,
             )
+            val battery = batteryState.value
+                ?: com.kmmm_engineering.chargeclock.battery.BatteryStatus(0, false, false)
             val scope = rememberCoroutineScope()
+
+            // Restore threshold-alert latch from DataStore once (survives process death).
+            var alertStateReady by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                thresholdTracker.restore(repo.loadThresholdAlertSnapshot())
+                alertStateReady = true
+            }
 
             // Apply language override (AppCompat per-app locales). Activity recreates on change.
             LaunchedEffect(settingsState.value?.language) {
@@ -139,20 +148,31 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // Discord thresholds
+            // Discord thresholds — notify only on crossing, never on cold start while already
+            // on the alert side. Wait for DataStore settings + real battery + restored latch.
             LaunchedEffect(
+                batteryState.value,
+                settingsState.value,
+                alertStateReady,
                 battery.percent,
                 battery.isCharging,
                 settings.discordDischargeThreshold,
                 settings.discordChargeThreshold,
                 settings.discordWebhookUrl,
             ) {
+                if (!alertStateReady) return@LaunchedEffect
+                if (settingsState.value == null) return@LaunchedEffect
+                if (batteryState.value == null) return@LaunchedEffect
+
                 val kind = thresholdTracker.check(
                     percent = battery.percent,
                     isCharging = battery.isCharging,
                     dischargeThreshold = settings.discordDischargeThreshold,
                     chargeThreshold = settings.discordChargeThreshold,
                 )
+                // Persist latch / last percent so process death does not re-arm spuriously.
+                repo.saveThresholdAlertSnapshot(thresholdTracker.snapshot())
+
                 if (kind != null && settings.discordWebhookUrl.isNotBlank()) {
                     val msg = when (kind) {
                         "discharge" -> getString(R.string.discord_discharge_msg, battery.percent)

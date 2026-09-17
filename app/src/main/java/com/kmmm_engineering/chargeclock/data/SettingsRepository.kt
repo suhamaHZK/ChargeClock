@@ -10,6 +10,8 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import com.kmmm_engineering.chargeclock.discord.ThresholdAlertSnapshot
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -33,6 +35,14 @@ class SettingsRepository(private val context: Context) {
         val exitOnUnplug = booleanPreferencesKey("exit_on_unplug")
         val allowAutoSleep = booleanPreferencesKey("allow_auto_sleep")
         val firstRunHintSeen = booleanPreferencesKey("first_run_hint_seen")
+        // Discord threshold-cross persistence (survives process death)
+        val alertLastPercent = intPreferencesKey("alert_last_percent")
+        val alertLastCharging = booleanPreferencesKey("alert_last_charging")
+        val alertDischargeArmed = booleanPreferencesKey("alert_discharge_armed")
+        val alertChargeArmed = booleanPreferencesKey("alert_charge_armed")
+        val alertLastDischargeThreshold = intPreferencesKey("alert_last_discharge_threshold")
+        val alertLastChargeThreshold = intPreferencesKey("alert_last_charge_threshold")
+        val alertSeeded = booleanPreferencesKey("alert_seeded")
     }
 
     val settingsFlow: Flow<UserSettings> = context.dataStore.data.map { prefs ->
@@ -141,4 +151,31 @@ class SettingsRepository(private val context: Context) {
     suspend fun setExitOnUnplug(v: Boolean) = update { it.copy(exitOnUnplug = v) }
     suspend fun setAllowAutoSleep(v: Boolean) = update { it.copy(allowAutoSleep = v) }
     suspend fun markFirstRunHintSeen() = update { it.copy(firstRunHintSeen = true) }
+
+    suspend fun loadThresholdAlertSnapshot(): ThresholdAlertSnapshot {
+        val prefs = context.dataStore.data.first()
+        val seeded = prefs[Keys.alertSeeded] ?: false
+        val lastPercent = prefs[Keys.alertLastPercent] ?: -1
+        return ThresholdAlertSnapshot(
+            lastPercent = lastPercent,
+            lastCharging = prefs[Keys.alertLastCharging] ?: false,
+            dischargeArmed = prefs[Keys.alertDischargeArmed] ?: true,
+            chargeArmed = prefs[Keys.alertChargeArmed] ?: true,
+            lastDischargeThreshold = prefs[Keys.alertLastDischargeThreshold] ?: -1,
+            lastChargeThreshold = prefs[Keys.alertLastChargeThreshold] ?: -1,
+            seeded = seeded && lastPercent >= 0,
+        )
+    }
+
+    suspend fun saveThresholdAlertSnapshot(snapshot: ThresholdAlertSnapshot) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.alertLastPercent] = snapshot.lastPercent
+            prefs[Keys.alertLastCharging] = snapshot.lastCharging
+            prefs[Keys.alertDischargeArmed] = snapshot.dischargeArmed
+            prefs[Keys.alertChargeArmed] = snapshot.chargeArmed
+            prefs[Keys.alertLastDischargeThreshold] = snapshot.lastDischargeThreshold
+            prefs[Keys.alertLastChargeThreshold] = snapshot.lastChargeThreshold
+            prefs[Keys.alertSeeded] = snapshot.seeded
+        }
+    }
 }
