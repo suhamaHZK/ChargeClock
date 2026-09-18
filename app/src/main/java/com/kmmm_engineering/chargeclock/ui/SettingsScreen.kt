@@ -149,9 +149,10 @@ fun SettingsScreen(
             )
 
             SectionTitle(stringResource(R.string.text_color))
-            TextColorPickerButton(
+            TextColorPresetRow(
                 selectedArgb = settings.textColorArgb,
-                onClick = { showColorPicker = true },
+                onPreset = { argb -> scope.launch { repository.setTextColorArgb(argb) } },
+                onOpenPicker = { showColorPicker = true },
             )
 
             SectionTitle(stringResource(R.string.discord_webhook))
@@ -328,21 +329,72 @@ fun SettingsScreen(
     }
 }
 
+/** Historical preset palette (v0.1.11); values written as free ARGB. */
+private val TextColorPresetArgb: List<Long> = listOf(
+    0xFFFFFFFFL, // WHITE
+    0xFFFFC107L, // AMBER
+    0xFF4CAF50L, // GREEN
+    0xFF00BCD4L, // CYAN
+    0xFFE91E63L, // PINK
+    0xFFFF9800L, // ORANGE
+)
+
+@Composable
+private fun TextColorPresetRow(
+    selectedArgb: Long,
+    onPreset: (Long) -> Unit,
+    onOpenPicker: () -> Unit,
+) {
+    val matchedPreset = TextColorPresetArgb.firstOrNull { it == selectedArgb }
+    val pickerSelected = matchedPreset == null
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        TextColorPresetArgb.forEach { argb ->
+            val selected = matchedPreset == argb
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color(argb))
+                    .then(
+                        if (selected) Modifier.border(2.dp, Color.White, CircleShape)
+                        else Modifier.border(1.dp, Color(0xFF444444), CircleShape),
+                    )
+                    .clickable { onPreset(argb) },
+            )
+        }
+        TextColorPickerButton(
+            selectedArgb = selectedArgb,
+            selected = pickerSelected,
+            onClick = onOpenPicker,
+        )
+    }
+}
+
 /**
- * Donut wheel icon with a Compose circle overlay showing the selected text color.
+ * Donut wheel icon with a Compose circle overlay showing the current text color.
  * Center radius ≈ 125/256 of the icon (matches ColorPicker.svg).
+ * When [selected] (custom color, no preset match), draws a white ring.
  */
 @Composable
 private fun TextColorPickerButton(
     selectedArgb: Long,
+    selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val iconSize = 48.dp
+    val iconSize = 40.dp
     // SVG center circle r=125 in 512 viewport → diameter fraction 250/512
     val centerSize = iconSize * (250f / 512f)
     Box(
         modifier = Modifier
             .size(iconSize)
+            .then(
+                if (selected) Modifier.border(2.dp, Color.White, CircleShape)
+                else Modifier,
+            )
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
