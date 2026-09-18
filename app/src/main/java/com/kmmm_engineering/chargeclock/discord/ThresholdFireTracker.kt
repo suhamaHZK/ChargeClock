@@ -3,15 +3,18 @@ package com.kmmm_engineering.chargeclock.discord
 /**
  * Threshold-cross Discord alerts.
  *
- * Fires only when transitioning across a threshold:
+ * Fires only when transitioning across a threshold **while the app is observing**:
  * - Discharge: previously above [dischargeThreshold], now ≤ it (while discharging)
  * - Charge: previously below [chargeThreshold], now ≥ it (while charging)
  *
- * Cold start / process death: either restore persisted state via [restore], or on the
- * first [check] seed from the current battery **without firing** so "already on the
- * alert side" does not re-notify.
+ * Process start / cold start: [restore] always leaves the tracker unseeded, so the
+ * first [check] seeds from the **current** battery **without firing**. Crossings that
+ * happened while the process was dead are ignored (stale lastPercent is never used
+ * for cross detection across process boundaries).
  *
- * OFF thresholds (-1): never fire. Empty webhook is handled by the caller / notifier.
+ * While running: real crosses fire once; leave the alert zone to re-arm; threshold
+ * setting changes re-arm. OFF thresholds (-1) never fire. Empty webhook is handled
+ * by the caller / notifier.
  */
 data class ThresholdAlertSnapshot(
     val lastPercent: Int = -1,
@@ -32,6 +35,11 @@ class ThresholdFireTracker {
     private var lastChargeThreshold: Int = -1
     private var seeded: Boolean = false
 
+    /**
+     * Load persisted latch fields. Always forces [seeded]=false so the first [check]
+     * after process start re-seeds from the live battery without treating a
+     * pre-death lastPercent → current percent gap as a cross.
+     */
     fun restore(snapshot: ThresholdAlertSnapshot) {
         lastPercent = snapshot.lastPercent
         lastCharging = snapshot.lastCharging
@@ -39,7 +47,8 @@ class ThresholdFireTracker {
         chargeArmed = snapshot.chargeArmed
         lastDischargeThreshold = snapshot.lastDischargeThreshold
         lastChargeThreshold = snapshot.lastChargeThreshold
-        seeded = snapshot.seeded && snapshot.lastPercent >= 0
+        // New process: never trust pre-death lastPercent for cross detection.
+        seeded = false
     }
 
     fun snapshot(): ThresholdAlertSnapshot = ThresholdAlertSnapshot(

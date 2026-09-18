@@ -63,7 +63,7 @@ class MainActivity : AppCompatActivity() {
                 ?: com.kmmm_engineering.chargeclock.battery.BatteryStatus(0, false, false)
             val scope = rememberCoroutineScope()
 
-            // Restore threshold-alert latch from DataStore once (survives process death).
+            // Restore threshold-alert latch from DataStore once; restore forces re-seed on first check.
             var alertStateReady by remember { mutableStateOf(false) }
             LaunchedEffect(Unit) {
                 thresholdTracker.restore(repo.loadThresholdAlertSnapshot())
