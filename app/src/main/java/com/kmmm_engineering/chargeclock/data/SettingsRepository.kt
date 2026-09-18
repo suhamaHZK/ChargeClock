@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -21,7 +22,9 @@ class SettingsRepository(private val context: Context) {
     private object Keys {
         val language = stringPreferencesKey("language")
         val idleBrightness = floatPreferencesKey("idle_brightness")
-        val textColor = stringPreferencesKey("text_color")
+        /** Legacy preset enum name (WHITE/AMBER/…). Migrated to [textColorArgb]. */
+        val textColorLegacy = stringPreferencesKey("text_color")
+        val textColorArgb = longPreferencesKey("text_color_argb")
         val discordWebhookUrl = stringPreferencesKey("discord_webhook_url")
         val discordDischarge = intPreferencesKey("discord_discharge")
         val discordCharge = intPreferencesKey("discord_charge")
@@ -45,80 +48,70 @@ class SettingsRepository(private val context: Context) {
         val alertSeeded = booleanPreferencesKey("alert_seeded")
     }
 
+    /** Prior preset palette (v0.1.11 and earlier). */
+    private val legacyTextColorArgb: Map<String, Long> = mapOf(
+        "WHITE" to 0xFFFFFFFFL,
+        "AMBER" to 0xFFFFC107L,
+        "GREEN" to 0xFF4CAF50L,
+        "CYAN" to 0xFF00BCD4L,
+        "PINK" to 0xFFE91E63L,
+        "ORANGE" to 0xFFFF9800L,
+    )
+
+    private fun readTextColorArgb(prefs: Preferences): Long {
+        prefs[Keys.textColorArgb]?.let { return it }
+        val legacy = prefs[Keys.textColorLegacy] ?: return 0xFFFFFFFFL
+        legacyTextColorArgb[legacy]?.let { return it }
+        // Numeric string leftover, if any
+        legacy.toLongOrNull()?.let { return it }
+        legacy.removePrefix("0x").toLongOrNull(16)?.let { return it }
+        return 0xFFFFFFFFL
+    }
+
+    private fun prefsToSettings(prefs: Preferences): UserSettings = UserSettings(
+        language = prefs[Keys.language]?.let {
+            runCatching { AppLanguage.valueOf(it) }.getOrDefault(AppLanguage.SYSTEM)
+        } ?: AppLanguage.SYSTEM,
+        idleBrightness = prefs[Keys.idleBrightness] ?: 0.10f,
+        textColorArgb = readTextColorArgb(prefs),
+        discordWebhookUrl = prefs[Keys.discordWebhookUrl] ?: "",
+        discordDischargeThreshold = prefs[Keys.discordDischarge] ?: -1,
+        discordChargeThreshold = prefs[Keys.discordCharge] ?: -1,
+        landscapeMode = prefs[Keys.landscape]?.let {
+            runCatching { LandscapeMode.valueOf(it) }.getOrDefault(LandscapeMode.OFF)
+        } ?: LandscapeMode.OFF,
+        displayScale = prefs[Keys.displayScale]?.let {
+            runCatching { DisplayScale.valueOf(it) }.getOrDefault(DisplayScale.NORMAL)
+        } ?: DisplayScale.NORMAL,
+        use24Hour = prefs[Keys.use24Hour] ?: true,
+        showSeconds = prefs[Keys.showSeconds] ?: true,
+        dateFormat = prefs[Keys.dateFormat]?.let {
+            runCatching { DateFormatOption.valueOf(it) }.getOrDefault(DateFormatOption.YMD)
+        } ?: DateFormatOption.YMD,
+        monthFormat = prefs[Keys.monthFormat]?.let {
+            runCatching { MonthFormatOption.valueOf(it) }.getOrDefault(MonthFormatOption.NUMERIC)
+        } ?: MonthFormatOption.NUMERIC,
+        weekdayFormat = prefs[Keys.weekdayFormat]?.let {
+            runCatching { WeekdayFormatOption.valueOf(it) }.getOrDefault(WeekdayFormatOption.EN)
+        } ?: WeekdayFormatOption.EN,
+        exitOnUnplug = prefs[Keys.exitOnUnplug] ?: false,
+        allowAutoSleep = prefs[Keys.allowAutoSleep] ?: false,
+        firstRunHintSeen = prefs[Keys.firstRunHintSeen] ?: false,
+    )
+
     val settingsFlow: Flow<UserSettings> = context.dataStore.data.map { prefs ->
-        UserSettings(
-            language = prefs[Keys.language]?.let {
-                runCatching { AppLanguage.valueOf(it) }.getOrDefault(AppLanguage.SYSTEM)
-            } ?: AppLanguage.SYSTEM,
-            idleBrightness = prefs[Keys.idleBrightness] ?: 0.10f,
-            textColor = prefs[Keys.textColor]?.let {
-                runCatching { TextColorOption.valueOf(it) }.getOrDefault(TextColorOption.WHITE)
-            } ?: TextColorOption.WHITE,
-            discordWebhookUrl = prefs[Keys.discordWebhookUrl] ?: "",
-            discordDischargeThreshold = prefs[Keys.discordDischarge] ?: -1,
-            discordChargeThreshold = prefs[Keys.discordCharge] ?: -1,
-            landscapeMode = prefs[Keys.landscape]?.let {
-                runCatching { LandscapeMode.valueOf(it) }.getOrDefault(LandscapeMode.OFF)
-            } ?: LandscapeMode.OFF,
-            displayScale = prefs[Keys.displayScale]?.let {
-                runCatching { DisplayScale.valueOf(it) }.getOrDefault(DisplayScale.NORMAL)
-            } ?: DisplayScale.NORMAL,
-            use24Hour = prefs[Keys.use24Hour] ?: true,
-            showSeconds = prefs[Keys.showSeconds] ?: true,
-            dateFormat = prefs[Keys.dateFormat]?.let {
-                runCatching { DateFormatOption.valueOf(it) }.getOrDefault(DateFormatOption.YMD)
-            } ?: DateFormatOption.YMD,
-            monthFormat = prefs[Keys.monthFormat]?.let {
-                runCatching { MonthFormatOption.valueOf(it) }.getOrDefault(MonthFormatOption.NUMERIC)
-            } ?: MonthFormatOption.NUMERIC,
-            weekdayFormat = prefs[Keys.weekdayFormat]?.let {
-                runCatching { WeekdayFormatOption.valueOf(it) }.getOrDefault(WeekdayFormatOption.EN)
-            } ?: WeekdayFormatOption.EN,
-            exitOnUnplug = prefs[Keys.exitOnUnplug] ?: false,
-            allowAutoSleep = prefs[Keys.allowAutoSleep] ?: false,
-            firstRunHintSeen = prefs[Keys.firstRunHintSeen] ?: false,
-        )
+        prefsToSettings(prefs)
     }
 
     suspend fun update(transform: (UserSettings) -> UserSettings) {
         context.dataStore.edit { prefs ->
-            // Read current snapshot from prefs into a settings object, transform, write back
-            val current = UserSettings(
-                language = prefs[Keys.language]?.let {
-                    runCatching { AppLanguage.valueOf(it) }.getOrDefault(AppLanguage.SYSTEM)
-                } ?: AppLanguage.SYSTEM,
-                idleBrightness = prefs[Keys.idleBrightness] ?: 0.10f,
-                textColor = prefs[Keys.textColor]?.let {
-                    runCatching { TextColorOption.valueOf(it) }.getOrDefault(TextColorOption.WHITE)
-                } ?: TextColorOption.WHITE,
-                discordWebhookUrl = prefs[Keys.discordWebhookUrl] ?: "",
-                discordDischargeThreshold = prefs[Keys.discordDischarge] ?: -1,
-                discordChargeThreshold = prefs[Keys.discordCharge] ?: -1,
-                landscapeMode = prefs[Keys.landscape]?.let {
-                    runCatching { LandscapeMode.valueOf(it) }.getOrDefault(LandscapeMode.OFF)
-                } ?: LandscapeMode.OFF,
-                displayScale = prefs[Keys.displayScale]?.let {
-                    runCatching { DisplayScale.valueOf(it) }.getOrDefault(DisplayScale.NORMAL)
-                } ?: DisplayScale.NORMAL,
-                use24Hour = prefs[Keys.use24Hour] ?: true,
-                showSeconds = prefs[Keys.showSeconds] ?: true,
-                dateFormat = prefs[Keys.dateFormat]?.let {
-                    runCatching { DateFormatOption.valueOf(it) }.getOrDefault(DateFormatOption.YMD)
-                } ?: DateFormatOption.YMD,
-                monthFormat = prefs[Keys.monthFormat]?.let {
-                    runCatching { MonthFormatOption.valueOf(it) }.getOrDefault(MonthFormatOption.NUMERIC)
-                } ?: MonthFormatOption.NUMERIC,
-                weekdayFormat = prefs[Keys.weekdayFormat]?.let {
-                    runCatching { WeekdayFormatOption.valueOf(it) }.getOrDefault(WeekdayFormatOption.EN)
-                } ?: WeekdayFormatOption.EN,
-                exitOnUnplug = prefs[Keys.exitOnUnplug] ?: false,
-                allowAutoSleep = prefs[Keys.allowAutoSleep] ?: false,
-                firstRunHintSeen = prefs[Keys.firstRunHintSeen] ?: false,
-            )
+            val current = prefsToSettings(prefs)
             val next = transform(current)
             prefs[Keys.language] = next.language.name
             prefs[Keys.idleBrightness] = next.idleBrightness.coerceIn(0.01f, 0.35f)
-            prefs[Keys.textColor] = next.textColor.name
+            prefs[Keys.textColorArgb] = next.textColorArgb
+            // Drop legacy enum string once free ARGB is written
+            prefs.remove(Keys.textColorLegacy)
             prefs[Keys.discordWebhookUrl] = next.discordWebhookUrl
             prefs[Keys.discordDischarge] = next.discordDischargeThreshold
             prefs[Keys.discordCharge] = next.discordChargeThreshold
@@ -137,7 +130,7 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setLanguage(v: AppLanguage) = update { it.copy(language = v) }
     suspend fun setIdleBrightness(v: Float) = update { it.copy(idleBrightness = v) }
-    suspend fun setTextColor(v: TextColorOption) = update { it.copy(textColor = v) }
+    suspend fun setTextColorArgb(v: Long) = update { it.copy(textColorArgb = v) }
     suspend fun setDiscordWebhookUrl(v: String) = update { it.copy(discordWebhookUrl = v) }
     suspend fun setDiscordDischarge(v: Int) = update { it.copy(discordDischargeThreshold = v) }
     suspend fun setDiscordCharge(v: Int) = update { it.copy(discordChargeThreshold = v) }

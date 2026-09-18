@@ -22,3 +22,7 @@
     public static **[] values();
     public static ** valueOf(java.lang.String);
 }
+
+# HoloColorPicker (View-based, accessed via AndroidView)
+-keep class com.larswerkman.holocolorpicker.** { *; }
+-dontwarn com.larswerkman.holocolorpicker.**

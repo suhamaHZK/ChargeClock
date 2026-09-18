@@ -12,8 +12,8 @@ android {
         applicationId = "com.kmmm_engineering.chargeclock"
         minSdk = 29
         targetSdk = 35
-        versionCode = 12
-        versionName = "0.1.11"
+        versionCode = 13
+        versionName = "0.1.12"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -77,6 +77,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-core")
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("com.larswerkman:HoloColorPicker:1.5")
 
     testImplementation("junit:junit:4.13.2")
 

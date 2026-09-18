@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Donut color wheel only (no center fill). Overlay selected color in Compose. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <!-- Arc segment: outer r=220, inner r=135, center (256,256) -->
+    <path
+        android:fillColor="#FF3B30"
+        android:pathData="M 461.39,177.16 A 220 220 0 0 1 461.39,334.84 L 382.03,304.38 A 135 135 0 0 0 382.03,207.62 Z" />
+    <group
+        android:pivotX="256"
+        android:pivotY="256"
+        android:rotation="45">
+        <path
+            android:fillColor="#FF9500"
+            android:pathData="M 461.39,177.16 A 220 220 0 0 1 461.39,334.84 L 382.03,304.38 A 135 135 0 0 0 382.03,207.62 Z" />
+    </group>
+    <group
+        android:pivotX="256"
+        android:pivotY="256"
+        android:rotation="90">
+        <path
+            android:fillColor="#FFCC00"
+            android:pathData="M 461.39,177.16 A 220 220 0 0 1 461.39,334.84 L 382.03,304.38 A 135 135 0 0 0 382.03,207.62 Z" />
+    </group>
+    <group
+        android:pivotX="256"
+        android:pivotY="256"
+        android:rotation="135">
+        <path
+            android:fillColor="#34C759"
+            android:pathData="M 461.39,177.16 A 220 220 0 0 1 461.39,334.84 L 382.03,304.38 A 135 135 0 0 0 382.03,207.62 Z" />
+    </group>
+    <group
+        android:pivotX="256"
+        android:pivotY="256"
+        android:rotation="180">
+        <path
+            android:fillColor="#00C7BE"
+            android:pathData="M 461.39,177.16 A 220 220 0 0 1 461.39,334.84 L 382.03,304.38 A 135 135 0 0 0 382.03,207.62 Z" />
+    </group>
+    <group
+        android:pivotX="256"
+        android:pivotY="256"
+        android:rotation="225">
+        <path
+            android:fillColor="#007AFF"
+            android:pathData="M 461.39,177.16 A 220 220 0 0 1 461.39,334.84 L 382.03,304.38 A 135 135 0 0 0 382.03,207.62 Z" />
+    </group>
+    <group
+        android:pivotX="256"
+        android:pivotY="256"
+        android:rotation="270">
+        <path
+            android:fillColor="#AF52DE"
+            android:pathData="M 461.39,177.16 A 220 220 0 0 1 461.39,334.84 L 382.03,304.38 A 135 135 0 0 0 382.03,207.62 Z" />
+    </group>
+    <group
+        android:pivotX="256"
+        android:pivotY="256"
+        android:rotation="315">
+        <path
+            android:fillColor="#FF2D55"
+            android:pathData="M 461.39,177.16 A 220 220 0 0 1 461.39,334.84 L 382.03,304.38 A 135 135 0 0 0 382.03,207.62 Z" />
+    </group>
+</vector>

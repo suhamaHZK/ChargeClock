@@ -45,14 +45,12 @@
     <string name="discord_discharge_msg">Battery at %1$d%% (discharging)</string>
     <string name="discord_charge_msg">Battery at %1$d%% (charging)</string>
     <string name="battery_percent">%1$d%%</string>
-    <string name="color_white">White</string>
-    <string name="color_amber">Amber</string>
-    <string name="color_green">Green</string>
-    <string name="color_cyan">Cyan</string>
-    <string name="color_pink">Pink</string>
-    <string name="color_orange">Orange</string>
     <string name="scale_small">Small</string>
     <string name="scale_normal">Normal</string>
     <string name="scale_large">Large</string>
     <string name="scale_xlarge">Extra large</string>
+    <string name="color_picker_ok">OK</string>
+    <string name="color_picker_cancel">Cancel</string>
+    <string name="credits_oss">Credits / Open source</string>
+    <string name="credits_holocolorpicker">HoloColorPicker — Lars Werkman — Apache License 2.0 — https://github.com/LarsWerkman/HoloColorPicker</string>
 </resources>

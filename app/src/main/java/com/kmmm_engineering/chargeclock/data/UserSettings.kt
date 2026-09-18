@@ -10,15 +10,6 @@ enum class MonthFormatOption { NUMERIC, ABBR }
 
 enum class WeekdayFormatOption { EN, JA, TW, CN }
 
-enum class TextColorOption(val argb: Long) {
-    WHITE(0xFFFFFFFF),
-    AMBER(0xFFFFC107),
-    GREEN(0xFF4CAF50),
-    CYAN(0xFF00BCD4),
-    PINK(0xFFE91E63),
-    ORANGE(0xFFFF9800),
-}
-
 /** Display scale multipliers for the clock block. */
 enum class DisplayScale(val factor: Float) {
     SMALL(0.85f),
@@ -29,11 +20,14 @@ enum class DisplayScale(val factor: Float) {
 
 /**
  * Discord threshold: -1 = OFF, otherwise 5..100 step 5.
+ *
+ * [textColorArgb] is opaque ARGB (default white). Legacy preset enum names
+ * (WHITE/AMBER/…) are migrated when reading DataStore.
  */
 data class UserSettings(
     val language: AppLanguage = AppLanguage.SYSTEM,
     val idleBrightness: Float = 0.10f,
-    val textColor: TextColorOption = TextColorOption.WHITE,
+    val textColorArgb: Long = 0xFFFFFFFFL,
     val discordWebhookUrl: String = "",
     val discordDischargeThreshold: Int = -1,
     val discordChargeThreshold: Int = -1,

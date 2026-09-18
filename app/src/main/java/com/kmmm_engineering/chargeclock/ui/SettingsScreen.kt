@@ -1,5 +1,8 @@
 package com.kmmm_engineering.chargeclock.ui
 
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,6 +39,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -47,8 +52,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.kmmm_engineering.chargeclock.R
 import com.kmmm_engineering.chargeclock.data.AppLanguage
 import com.kmmm_engineering.chargeclock.data.DateFormatOption
@@ -56,10 +64,11 @@ import com.kmmm_engineering.chargeclock.data.DisplayScale
 import com.kmmm_engineering.chargeclock.data.LandscapeMode
 import com.kmmm_engineering.chargeclock.data.MonthFormatOption
 import com.kmmm_engineering.chargeclock.data.SettingsRepository
-import com.kmmm_engineering.chargeclock.data.TextColorOption
 import com.kmmm_engineering.chargeclock.data.UserSettings
 import com.kmmm_engineering.chargeclock.data.WeekdayFormatOption
 import com.kmmm_engineering.chargeclock.discord.DiscordNotifier
+import com.larswerkman.holocolorpicker.ColorPicker
+import com.larswerkman.holocolorpicker.SVBar
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -76,6 +85,7 @@ fun SettingsScreen(
         mutableStateOf(settings.discordWebhookUrl)
     }
     var testSending by remember { mutableStateOf(false) }
+    var showColorPicker by remember { mutableStateOf(false) }
     val testEmptyMsg = stringResource(R.string.discord_test_empty)
     val testOkMsg = stringResource(R.string.discord_test_ok)
     val testFailMsg = stringResource(R.string.discord_test_fail)
@@ -139,22 +149,10 @@ fun SettingsScreen(
             )
 
             SectionTitle(stringResource(R.string.text_color))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                TextColorOption.entries.forEach { opt ->
-                    val selected = settings.textColor == opt
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color(opt.argb))
-                            .then(
-                                if (selected) Modifier.border(2.dp, Color.White, CircleShape)
-                                else Modifier.border(1.dp, Color(0xFF444444), CircleShape)
-                            )
-                            .clickable { scope.launch { repository.setTextColor(opt) } },
-                    )
-                }
-            }
+            TextColorPickerButton(
+                selectedArgb = settings.textColorArgb,
+                onClick = { showColorPicker = true },
+            )
 
             SectionTitle(stringResource(R.string.discord_webhook))
             OutlinedTextField(
@@ -307,9 +305,128 @@ fun SettingsScreen(
                 onCheckedChange = { scope.launch { repository.setAllowAutoSleep(it) } },
             )
 
+            SectionTitle(stringResource(R.string.credits_oss))
+            Text(
+                text = stringResource(R.string.credits_holocolorpicker),
+                color = Color(0xFFAAAAAA),
+                style = MaterialTheme.typography.bodySmall,
+            )
+
             Spacer(Modifier.height(32.dp))
         }
     }
+
+    if (showColorPicker) {
+        HoloColorPickerDialog(
+            initialArgb = settings.textColorArgb,
+            onDismiss = { showColorPicker = false },
+            onConfirm = { argb ->
+                scope.launch { repository.setTextColorArgb(argb) }
+                showColorPicker = false
+            },
+        )
+    }
+}
+
+/**
+ * Donut wheel icon with a Compose circle overlay showing the selected text color.
+ * Center radius ≈ 125/256 of the icon (matches ColorPicker.svg).
+ */
+@Composable
+private fun TextColorPickerButton(
+    selectedArgb: Long,
+    onClick: () -> Unit,
+) {
+    val iconSize = 48.dp
+    // SVG center circle r=125 in 512 viewport → diameter fraction 250/512
+    val centerSize = iconSize * (250f / 512f)
+    Box(
+        modifier = Modifier
+            .size(iconSize)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            painter = painterResource(R.drawable.ic_color_picker_wheel),
+            contentDescription = stringResource(R.string.text_color),
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit,
+        )
+        Box(
+            modifier = Modifier
+                .size(centerSize)
+                .clip(CircleShape)
+                .background(Color(selectedArgb))
+                .border(1.dp, Color(0xFF444444), CircleShape),
+        )
+    }
+}
+
+@Composable
+private fun HoloColorPickerDialog(
+    initialArgb: Long,
+    onDismiss: () -> Unit,
+    onConfirm: (Long) -> Unit,
+) {
+    val initialInt = ((initialArgb and 0xFFFFFFFFL).toInt() and 0x00FFFFFF) or android.graphics.Color.BLACK
+    // Holder so confirm can read the latest ColorPicker without Compose state writes from the View factory.
+    val pickerHolder = remember { arrayOfNulls<ColorPicker>(1) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.text_color)) },
+        text = {
+            AndroidView(
+                factory = { context ->
+                    LinearLayout(context).apply {
+                        orientation = LinearLayout.VERTICAL
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                        )
+                        val picker = ColorPicker(context).apply {
+                            layoutParams = LinearLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                            )
+                        }
+                        val svBar = SVBar(context).apply {
+                            layoutParams = LinearLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                            ).also { it.topMargin = (8 * resources.displayMetrics.density).toInt() }
+                        }
+                        picker.addSVBar(svBar)
+                        picker.setShowOldCenterColor(false)
+                        picker.setColor(initialInt)
+                        pickerHolder[0] = picker
+                        addView(picker)
+                        addView(svBar)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val fromPicker = pickerHolder[0]?.color ?: initialInt
+                    val rgb = (fromPicker and 0x00FFFFFF) or android.graphics.Color.BLACK
+                    onConfirm(rgb.toLong() and 0xFFFFFFFFL)
+                },
+            ) {
+                Text(stringResource(R.string.color_picker_ok))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.color_picker_cancel))
+            }
+        },
+        containerColor = Color(0xFF1E1E1E),
+        titleContentColor = Color.White,
+        textContentColor = Color.White,
+    )
 }
 
 @Composable

@@ -102,7 +102,7 @@ fun ClockScreen(
     }
     val dateText = Formatters.formatDate(cal, settings)
     val timeParts = Formatters.formatTimeParts(cal, settings)
-    val textColor = Color(settings.textColor.argb)
+    val textColor = Color(settings.textColorArgb)
     val scale = settings.displayScale.factor
 
     Box(
