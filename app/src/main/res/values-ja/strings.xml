@@ -53,4 +53,32 @@
     <string name="color_picker_cancel">キャンセル</string>
     <string name="credits_oss">クレジット / オープンソース</string>
     <string name="credits_holocolorpicker">HoloColorPicker — Lars Werkman — Apache License 2.0 — https://github.com/LarsWerkman/HoloColorPicker</string>
+    <string name="about_section">情報</string>
+    <string name="privacy_policy">プライバシーポリシー</string>
+    <string name="privacy_policy_title">プライバシーポリシー</string>
+    <string name="privacy_policy_body">充電時計（Charge Clock）プライバシーポリシー
+
+最終更新: 2026-09-20
+開発者: kmmm_engineering（プレースホルダ — 必要に応じて編集）
+
+本ポリシーは、充電時計が情報をどのように扱うかを説明します。
+
+1. 端末内のみに保存されるデータ
+言語、待機輝度、文字色、表示形式、Discord Webhook URL、バッテリー通知閾値、横表示、充電器抜去時終了、自動スリープなど、設定内容は Android DataStore / 端末内の設定としてローカルに保存されます。開発者が運営するサーバへこれらの設定を送信することはありません。
+
+2. Discord Webhook（任意）
+Discord Webhook URL を入力した場合、バッテリー閾値の到達通知およびテスト送信のメッセージを、そのユーザー指定 URL へ HTTP POST します。本アプリは独自の通知サーバを運営しません。Webhook URL とメッセージ内容は、ユーザーの設定どおり Discord（第三者）へ送信されます。Webhook 欄を空にすればこの機能は無効です。Discord 側で受け取るデータについては Discord のプライバシーポリシーが適用されます。
+
+3. アカウント・広告・解析なし
+本アプリはアカウント登録を必要としません。広告 SDK や解析／トラッキング SDK は含まれていません。
+
+4. ネットワーク権限
+INTERNET 権限は、Webhook URL を設定したとき（またはテスト送信時）の Discord への送信にのみ使用します。その他の機能はオフラインで動作します。
+
+5. データの販売なし
+個人データを販売しません。設定は端末内に留まり、ユーザーが制御する Webhook へ通知を送る場合を除き外部へ送られません。
+
+6. お問い合わせ
+本ポリシーに関するお問い合わせ: [CONTACT_EMAIL_PLACEHOLDER]
+公開時に実在の連絡先へ置き換えてください。</string>
 </resources>

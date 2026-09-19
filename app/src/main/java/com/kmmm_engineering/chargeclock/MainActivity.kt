@@ -31,6 +31,7 @@ import com.kmmm_engineering.chargeclock.data.UserSettings
 import com.kmmm_engineering.chargeclock.discord.DiscordNotifier
 import com.kmmm_engineering.chargeclock.discord.ThresholdFireTracker
 import com.kmmm_engineering.chargeclock.ui.ClockScreen
+import com.kmmm_engineering.chargeclock.ui.PrivacyPolicyScreen
 import com.kmmm_engineering.chargeclock.ui.SettingsScreen
 import com.kmmm_engineering.chargeclock.ui.theme.ChargeClockTheme
 import kotlinx.coroutines.delay
@@ -100,6 +101,7 @@ class MainActivity : AppCompatActivity() {
             // Settings screen: null = readable (system); non-null = live idle-slider preview
             var settingsBrightnessPreview by remember { mutableStateOf<Float?>(null) }
             var showSettings by remember { mutableStateOf(false) }
+            var showPrivacy by remember { mutableStateOf(false) }
             // Anti-misoperation unlock slider visible on clock → readable brightness
             var unlockSliderVisible by remember { mutableStateOf(false) }
             // Only poll while resumed so onPause system-brightness restore is not fought
@@ -127,13 +129,14 @@ class MainActivity : AppCompatActivity() {
 
             LaunchedEffect(
                 showSettings,
+                showPrivacy,
                 settingsBrightnessPreview,
                 settings.idleBrightness,
                 brightUntil,
                 unlockSliderVisible,
             ) {
                 when {
-                    showSettings -> {
+                    showSettings || showPrivacy -> {
                         val preview = settingsBrightnessPreview
                         if (preview != null) {
                             applyWindowBrightness(preview)
@@ -153,7 +156,7 @@ class MainActivity : AppCompatActivity() {
                             val remaining = brightUntil - now
                             delay(remaining)
                             // Re-check: may have entered settings / slider during delay
-                            if (!showSettings && !unlockSliderVisible) {
+                            if (!showSettings && !showPrivacy && !unlockSliderVisible) {
                                 applyWindowBrightness(settings.idleBrightness)
                             }
                         } else {
@@ -168,7 +171,7 @@ class MainActivity : AppCompatActivity() {
             LaunchedEffect(activityResumed, settings.idleBrightness) {
                 if (!activityResumed) return@LaunchedEffect
                 while (true) {
-                    if (!showSettings && !unlockSliderVisible) {
+                    if (!showSettings && !showPrivacy && !unlockSliderVisible) {
                         val now = System.currentTimeMillis()
                         val idleDeadline = maxOf(lastInteractionAt + 5_000L, brightUntil)
                         if (now >= idleDeadline) {
@@ -241,21 +244,36 @@ class MainActivity : AppCompatActivity() {
 
             key(localeKey) {
                 ChargeClockTheme {
-                    if (showSettings) {
-                        SettingsScreen(
-                            settings = settings,
-                            repository = repo,
-                            onBack = {
-                                settingsBrightnessPreview = null
-                                showSettings = false
-                                markInteraction()
-                                hideSystemBars()
-                            },
-                            onIdleBrightnessPreview = { preview ->
-                                settingsBrightnessPreview = preview
-                            },
-                        )
-                    } else {
+                    when {
+                        showPrivacy -> {
+                            PrivacyPolicyScreen(
+                                onBack = {
+                                    showPrivacy = false
+                                    markInteraction()
+                                    hideSystemBars()
+                                },
+                            )
+                        }
+                        showSettings -> {
+                            SettingsScreen(
+                                settings = settings,
+                                repository = repo,
+                                onBack = {
+                                    settingsBrightnessPreview = null
+                                    showSettings = false
+                                    markInteraction()
+                                    hideSystemBars()
+                                },
+                                onOpenPrivacy = {
+                                    showPrivacy = true
+                                    markInteraction()
+                                },
+                                onIdleBrightnessPreview = { preview ->
+                                    settingsBrightnessPreview = preview
+                                },
+                            )
+                        }
+                        else -> {
                         ClockScreen(
                             settings = settings,
                             batteryPercent = battery.percent,
@@ -277,6 +295,7 @@ class MainActivity : AppCompatActivity() {
                                 unlockSliderVisible = visible
                             },
                         )
+                        }
                     }
                 }
             }
