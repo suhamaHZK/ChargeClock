@@ -12,8 +12,8 @@ android {
         applicationId = "com.kmmm_engineering.chargeclock"
         minSdk = 29
         targetSdk = 35
-        versionCode = 14
-        versionName = "0.1.13"
+        versionCode = 100
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
