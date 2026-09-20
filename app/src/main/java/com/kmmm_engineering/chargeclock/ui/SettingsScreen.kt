@@ -1,5 +1,7 @@
 package com.kmmm_engineering.chargeclock.ui
 
+import android.content.res.Configuration
+import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import androidx.compose.foundation.Image
@@ -53,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -110,10 +113,18 @@ fun SettingsScreen(
         },
         containerColor = Color.Black,
     ) { padding ->
-        Column(
+        // Landscape: keep content in the middle ~80% width (≈10% unused each side).
+        val isLandscape =
+            LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(padding),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(if (isLandscape) 0.8f else 1f)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -315,6 +326,7 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(32.dp))
         }
+        } // Box (landscape width centering)
     }
 
     if (showColorPicker) {
@@ -423,41 +435,67 @@ private fun HoloColorPickerDialog(
     val initialInt = ((initialArgb and 0xFFFFFFFFL).toInt() and 0x00FFFFFF) or android.graphics.Color.BLACK
     // Holder so confirm can read the latest ColorPicker without Compose state writes from the View factory.
     val pickerHolder = remember { arrayOfNulls<ColorPicker>(1) }
+    val isLandscape =
+        LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.text_color)) },
         text = {
-            AndroidView(
-                factory = { context ->
-                    LinearLayout(context).apply {
-                        orientation = LinearLayout.VERTICAL
-                        layoutParams = ViewGroup.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.WRAP_CONTENT,
-                        )
-                        val picker = ColorPicker(context).apply {
-                            layoutParams = LinearLayout.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.WRAP_CONTENT,
-                            )
+            // Landscape punch-hole devices clip a vertical wheel+bar stack; scroll as a safety net.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (isLandscape) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+            ) {
+                AndroidView(
+                    factory = { context ->
+                        if (context.resources.configuration.orientation ==
+                            Configuration.ORIENTATION_LANDSCAPE
+                        ) {
+                            // Side-by-side: wheel | vertical SVBar (XML sets bar_orientation_horizontal=false).
+                            val root = LayoutInflater.from(context)
+                                .inflate(R.layout.dialog_holo_color_picker_land, null, false)
+                            val picker = root.findViewById<ColorPicker>(R.id.color_picker)
+                            val svBar = root.findViewById<SVBar>(R.id.sv_bar)
+                            picker.addSVBar(svBar)
+                            picker.setShowOldCenterColor(false)
+                            picker.setColor(initialInt)
+                            pickerHolder[0] = picker
+                            root
+                        } else {
+                            LinearLayout(context).apply {
+                                orientation = LinearLayout.VERTICAL
+                                layoutParams = ViewGroup.LayoutParams(
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                                )
+                                val picker = ColorPicker(context).apply {
+                                    layoutParams = LinearLayout.LayoutParams(
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
+                                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                                    )
+                                }
+                                val svBar = SVBar(context).apply {
+                                    layoutParams = LinearLayout.LayoutParams(
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
+                                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                                    ).also {
+                                        it.topMargin = (8 * resources.displayMetrics.density).toInt()
+                                    }
+                                }
+                                picker.addSVBar(svBar)
+                                picker.setShowOldCenterColor(false)
+                                picker.setColor(initialInt)
+                                pickerHolder[0] = picker
+                                addView(picker)
+                                addView(svBar)
+                            }
                         }
-                        val svBar = SVBar(context).apply {
-                            layoutParams = LinearLayout.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.WRAP_CONTENT,
-                            ).also { it.topMargin = (8 * resources.displayMetrics.density).toInt() }
-                        }
-                        picker.addSVBar(svBar)
-                        picker.setShowOldCenterColor(false)
-                        picker.setColor(initialInt)
-                        pickerHolder[0] = picker
-                        addView(picker)
-                        addView(svBar)
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         },
         confirmButton = {
             TextButton(

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Landscape: ColorPicker wheel + vertical SVBar side-by-side so the bar is not clipped. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="4dp">
+
+    <com.larswerkman.holocolorpicker.ColorPicker
+        android:id="@+id/color_picker"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        app:color_center_halo_radius="46dp"
+        app:color_center_radius="42dp"
+        app:color_wheel_radius="96dp" />
+
+    <com.larswerkman.holocolorpicker.SVBar
+        android:id="@+id/sv_bar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        app:bar_length="200dp"
+        app:bar_orientation_horizontal="false" />
+</LinearLayout>
