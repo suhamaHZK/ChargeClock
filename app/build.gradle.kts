@@ -6,14 +6,14 @@ plugins {
 
 android {
     namespace = "com.kmmm_engineering.chargeclock"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.kmmm_engineering.chargeclock"
         minSdk = 29
-        targetSdk = 35
-        versionCode = 101
-        versionName = "1.0.1"
+        targetSdk = 36
+        versionCode = 100
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

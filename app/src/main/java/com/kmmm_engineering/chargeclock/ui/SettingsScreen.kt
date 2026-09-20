@@ -21,7 +21,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
@@ -78,7 +77,6 @@ fun SettingsScreen(
     settings: UserSettings,
     repository: SettingsRepository,
     onBack: () -> Unit,
-    onOpenPrivacy: () -> Unit = {},
     onIdleBrightnessPreview: (Float?) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
@@ -314,27 +312,6 @@ fun SettingsScreen(
                 color = Color(0xFFAAAAAA),
                 style = MaterialTheme.typography.bodySmall,
             )
-
-            SectionTitle(stringResource(R.string.about_section))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onOpenPrivacy)
-                    .padding(vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = stringResource(R.string.privacy_policy),
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = Color(0xFFAAAAAA),
-                )
-            }
 
             Spacer(Modifier.height(32.dp))
         }
