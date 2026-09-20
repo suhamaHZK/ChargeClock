@@ -1,8 +1,11 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
 
 android {
     namespace = "com.kmmm_engineering.chargeclock"
@@ -12,14 +15,34 @@ android {
         applicationId = "com.kmmm_engineering.chargeclock"
         minSdk = 29
         targetSdk = 36
-        versionCode = 92
-        versionName = "0.9.2"
+        versionCode = 100
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
             // Drop x86/x86_64 emulator ABIs from sideload APK
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
+    }
+
+
+    // Release signing: reads gitignored keystore.properties (see keystore.properties.example).
+    // Do not commit passwords. If the file is absent, release builds remain unsigned.
+    val keystorePropertiesFile = rootProject.file("keystore.properties")
+    val keystoreProperties = Properties()
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+    }
+
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
         }
     }
 
@@ -31,6 +54,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
         // Optional lean debug for local testing (not default)
         debug {
