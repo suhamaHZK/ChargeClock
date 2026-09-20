@@ -13,11 +13,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -56,6 +60,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -435,18 +440,55 @@ private fun HoloColorPickerDialog(
     val initialInt = ((initialArgb and 0xFFFFFFFFL).toInt() and 0x00FFFFFF) or android.graphics.Color.BLACK
     // Holder so confirm can read the latest ColorPicker without Compose state writes from the View factory.
     val pickerHolder = remember { arrayOfNulls<ColorPicker>(1) }
-    val isLandscape =
-        LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val configuration = LocalConfiguration.current
+    val layoutDirection = LocalLayoutDirection.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    // Natural size of landscape XML: wheel (radius+pointerHalo)*2 beside vertical SVBar.
+    // Matches dialog_holo_color_picker_land.xml + HoloColorPicker 1.5 defaults.
+    val wheelNatural = 228.dp // 2 * (96dp wheel radius + 18dp pointer halo)
+    val barNaturalW = 28.dp // 2 * 14dp bar pointer halo
+    val barNaturalH = 228.dp // 200dp bar_length + 2 * 14dp halo
+    val rowPad = 8.dp // XML padding 4dp × 2
+    val barStartMargin = 12.dp
+    val needW = rowPad + wheelNatural + barStartMargin + barNaturalW
+    val needH = rowPad + maxOf(wheelNatural, barNaturalH)
+
+    // Available dialog content area: screen − system bars − dialog padding − title/button chrome.
+    val sysBars = WindowInsets.systemBars.asPaddingValues()
+    val dialogHInset = 48.dp // dialog side margins + text padding
+    val dialogVChrome = 172.dp // title row + button row + vertical paddings
+    val availW = configuration.screenWidthDp.dp -
+        sysBars.calculateLeftPadding(layoutDirection) -
+        sysBars.calculateRightPadding(layoutDirection) -
+        dialogHInset
+    val availH = configuration.screenHeightDp.dp -
+        sysBars.calculateTopPadding() -
+        sysBars.calculateBottomPadding() -
+        dialogVChrome
+
+    val scale = if (isLandscape) {
+        minOf(
+            1f,
+            (availW / needW).coerceAtLeast(0.01f),
+            (availH / needH).coerceAtLeast(0.01f),
+        )
+    } else {
+        1f
+    }
+    val scaledW = needW * scale
+    val scaledH = needH * scale
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.text_color)) },
         text = {
-            // Landscape punch-hole devices clip a vertical wheel+bar stack; scroll as a safety net.
+            // Primary: shrink wheel|SVBar to fit. Secondary: light scroll if chrome estimate is tight.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .then(if (isLandscape) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+                contentAlignment = Alignment.Center,
             ) {
                 AndroidView(
                     factory = { context ->
@@ -493,7 +535,12 @@ private fun HoloColorPickerDialog(
                             }
                         }
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = if (isLandscape) {
+                        // Constrain to scaled natural size; ColorPicker/SVBar onMeasure shrink to fit.
+                        Modifier.width(scaledW).height(scaledH)
+                    } else {
+                        Modifier.fillMaxWidth()
+                    },
                 )
             }
         },
