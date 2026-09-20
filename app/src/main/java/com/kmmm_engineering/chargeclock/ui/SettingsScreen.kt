@@ -119,18 +119,19 @@ fun SettingsScreen(
         containerColor = Color.Black,
     ) { padding ->
         // Landscape: keep content in the middle ~80% width (≈10% unused each side).
+        // Scroll on the full-width parent so side-margin drags also scroll.
         val isLandscape =
             LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            contentAlignment = Alignment.TopCenter,
+                .padding(padding)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth(if (isLandscape) 0.8f else 1f)
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -331,7 +332,7 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(32.dp))
         }
-        } // Box (landscape width centering)
+        } // outer full-width scroll (landscape side margins scroll too)
     }
 
     if (showColorPicker) {
