@@ -1,52 +1,61 @@
 # Charge Clock（充電時計）
 
-Fullscreen charging-oriented digital clock for Android 10+ (API 29).
+充電中向けの全画面デジタル時計アプリです。
 
+**対応OS:** Android 10（API 29）以上（compileSdk / targetSdk **36**）  
 **applicationId:** `com.kmmm_engineering.chargeclock`  
-**Display name:** 充電時計 / Charge Clock
+**表示名:** 充電時計 / Charge Clock  
+**最新ストア向けバージョン:** 1.0.0（versionCode 100）
 
-## Features (MVP)
+## Features
 
-- Immersive black fullscreen clock: date + weekday, time (seconds on by default), battery %
-- Idle window brightness (default ~10%) with 5s brighten on single tap; unlock-slider and settings use readable (system) brightness; live idle-slider preview in settings; restore system brightness on pause
-- OLED pixel shift every few minutes
-- Double-tap → rounded slide-to-settings (EN: `Slide to settings >>` / JA: `スライドで設定 >>`); landscape track ~half width
-- Settings via DataStore (per-app language via AppCompat locales, brightness, text color, Discord webhook/thresholds as dropdowns, landscape, scale, 12/24, seconds, date format dropdown, month chips, weekday format dropdown (EN/JA/TW/CN), exit on unplug = falling-edge only, auto-sleep)
-- Discord webhook notification once per threshold crossing
-- No ads, no IAP
-- **Not in MVP:** auto-start on plug-in
+- 没入型の黒背景フルスクリーン時計（日付＋曜日、時刻、バッテリー%）
+- 充電中は稲妻アイコン、残量は 10 ブロックの角丸バーでも表示
+- 待機輝度（デフォルト約 10%）、シングルタップで約 5 秒明るくする
+- 数分ごとの表示位置シフト（有機 EL 焼け対策）
+- ダブルタップ → スライドで設定（誤操作防止）
+- 設定: 言語、輝度、文字色（プリセット＋カラーピッカー）、Discord Webhook／閾値、強制横画面、表示サイズ、12/24・秒、日付／月／曜日形式、充電器抜去で終了、自動スリープ など
+- Discord は閾値をまたいだときのみ通知（テスト送信あり）
+- 広告・課金なし
+- **未実装（意図的）:** 充電開始での自動起動
 
 ## Build
 
 ```bash
-export ANDROID_HOME=/workspace/Android/Sdk
+export ANDROID_HOME=/path/to/Android/Sdk
 ./gradlew :app:assembleRelease
 ```
 
-Release APK (R8 minify + resource shrink, arm64-v8a / armeabi-v7a):  
-`app/build/outputs/apk/release/app-release-unsigned.apk`
+- Release APK（R8）: `app/build/outputs/apk/release/`
+- Play 用 AAB: `./gradlew :app:bundleRelease`（`keystore.properties` が必要。見本は `keystore.properties.example`）
 
-Debug (unminified, larger): `./gradlew :app:assembleDebug`
-
-Requires JDK 17+ and Android SDK 35.
+Requires **JDK 17+** and **Android SDK 36**.
 
 ## Typical APK size
 
-After dropping `material-icons-extended`, removing unused Navigation/ViewModel deps, and enabling R8:
-
-- **Release (minified):** typically **~3–6 MB** (Compose + Material3 baseline; not comparable to ~200 KB classic View apps)
-- **Debug (unminified):** previously ~58 MB mainly due to `material-icons-extended` and unshrunk DEX
-
-A ~200 KB “Battery Clock” style app usually uses the Android View system without Compose. Jetpack Compose + Material3 alone commonly add multiple MB even with aggressive R8.
+- **Release（minify）:** だいたい **約 4–5 MB**（Compose + Material3 前提）
+- Jetpack Compose を使うと、古典的な View のみの超軽量時計アプリ（数百 KB 級）より大きくなりがちです
 
 ## Stack
 
-AGP 8.7.3, Kotlin 2.0.21, Compose BOM 2024.10.01, DataStore Preferences, Material3, material-icons-core (not extended).
+- AGP 8.7.x / Kotlin 2.0.x / Compose BOM 2024.10.01
+- DataStore Preferences / Material3 / material-icons-core
+- [HoloColorPicker](https://github.com/LarsWerkman/HoloColorPicker) 1.5（設定の自由色選択）
 
-## Design
+## Design notes
 
-See `design/REQUIREMENTS.md`, `design/unlock-slider.svg`, and `design/battery-ui-sketch.svg`.
+See `design/REQUIREMENTS.md` and assets under `design/`.
 
 ## License
 
-Private repository. All rights reserved.
+本リポジトリのソースは **MIT License** です。詳細は [`LICENSE`](LICENSE) を参照してください。
+
+### サードパーティ
+
+本アプリは次のライブラリも含みます。**ライセンスは本リポジトリの MIT とは別**です。
+
+| ライブラリ | ライセンス | リンク |
+|------------|------------|--------|
+| HoloColorPicker (Lars Werkman) | Apache License 2.0 | https://github.com/LarsWerkman/HoloColorPicker |
+
+アプリ内のクレジット／OSS 表記にも同趣旨の記載があります。AndroidX などその他の依存は各成果物のライセンスに従ってください。

@@ -11,7 +11,7 @@
 | applicationId | `com.kmmm_engineering.chargeclock` |
 | GitHub（予定） | `suhamaHZK/ChargeClock`（private・未作成） |
 | 最低対応 | Android 10（API 29）以上 |
-| targetSdk | 実装時に現行推奨 |
+| targetSdk | 36 |
 | 課金・広告 | なし |
 
 充電中向けの全画面デジタル時計。日付・時刻・バッテリー残量を大きく表示する。
@@ -101,7 +101,7 @@ Webhook URL・実トークンは引継書やリポジトリに書かない。
 - 没入モード: システムバー非表示
 - 充電器切断で終了: 充電状態リスナー
 - 輝度: Activity Window の `screenBrightness`（0〜1）
-- minSdk 29 / targetSdk は実装時に現行推奨
+- minSdk 29 / targetSdk 36
 
 ## 6. 次のステップ
 
@@ -114,5 +114,5 @@ Webhook URL・実トークンは引継書やリポジトリに書かない。
 - デフォルト24時間・丸スライダー・「スライドで設定 >>」確定
 - 成果物先: GitHub `suhamaHZK/ChargeClock`（private）および Nextcloud
 - **参謀許可済み・実装開始**（コーディング／private リポジトリ作成／初回 push 許可）
-- targetSdk / compileSdk: 35（Plain Editor に合わせる）
+- targetSdk / compileSdk: 36
 - minSdk: 29
