@@ -51,6 +51,17 @@
     <string name="scale_xlarge">Extra large</string>
     <string name="color_picker_ok">OK</string>
     <string name="color_picker_cancel">Cancel</string>
+    <string name="discord_icon_get">Get webhook icon</string>
+    <string name="discord_icon_save_ok">Icon saved to DCIM</string>
+    <string name="discord_icon_save_fail">Failed to save icon</string>
+    <string name="widget_section">Home screen widget</string>
+    <string name="widget_pin">Add widget</string>
+    <string name="widget_pin_pick_title">Choose widget size</string>
+    <string name="widget_pin_compact">Compact (2x1)</string>
+    <string name="widget_pin_full">Full (4x2)</string>
+    <string name="widget_pin_unsupported">Pinning is not supported. Add the widget from the launcher widget list.</string>
+    <string name="widget_description_compact">Charge Clock - time and battery percent</string>
+    <string name="widget_description_full">Charge Clock - date, time, and battery</string>
     <string name="credits_oss">Credits / Open source</string>
-    <string name="credits_holocolorpicker">HoloColorPicker — Lars Werkman — Apache License 2.0 — https://github.com/LarsWerkman/HoloColorPicker</string>
+    <string name="credits_holocolorpicker">HoloColorPicker - Lars Werkman - Apache License 2.0 - https://github.com/LarsWerkman/HoloColorPicker</string>
 </resources>

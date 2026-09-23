@@ -105,4 +105,42 @@ class ThresholdFireTrackerTest {
         assertNull(t.check(percent = 15, isCharging = false, dischargeThreshold = 10, chargeThreshold = -1))
         assertEquals("discharge", t.check(percent = 10, isCharging = false, dischargeThreshold = 10, chargeThreshold = -1))
     }
+
+    @Test
+    fun restoreKeepingSeed_crossWhileDead_fires() {
+        // Widget / background polling: last live reading 45%, process idle, battery fell to 15%.
+        val t = ThresholdFireTracker()
+        t.restoreKeepingSeed(
+            ThresholdAlertSnapshot(
+                lastPercent = 45,
+                lastCharging = false,
+                dischargeArmed = true,
+                chargeArmed = true,
+                lastDischargeThreshold = 20,
+                lastChargeThreshold = -1,
+                seeded = true,
+            ),
+        )
+        assertEquals("discharge", t.check(percent = 15, isCharging = false, dischargeThreshold = 20, chargeThreshold = -1))
+        // Disarmed after fire
+        assertNull(t.check(percent = 10, isCharging = false, dischargeThreshold = 20, chargeThreshold = -1))
+    }
+
+    @Test
+    fun restoreKeepingSeed_invalidLastPercent_reseedsQuiet() {
+        val t = ThresholdFireTracker()
+        t.restoreKeepingSeed(
+            ThresholdAlertSnapshot(
+                lastPercent = -1,
+                lastCharging = false,
+                dischargeArmed = true,
+                chargeArmed = true,
+                lastDischargeThreshold = 20,
+                lastChargeThreshold = -1,
+                seeded = true,
+            ),
+        )
+        // Invalid lastPercent → treat as unseeded
+        assertNull(t.check(percent = 15, isCharging = false, dischargeThreshold = 20, chargeThreshold = -1))
+    }
 }

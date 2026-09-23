@@ -23,6 +23,9 @@ enum class DisplayScale(val factor: Float) {
  *
  * [textColorArgb] is opaque ARGB (default white). Legacy preset enum names
  * (WHITE/AMBER/…) are migrated when reading DataStore.
+ *
+ * [settingsOpenedOnce] is true after SettingsScreen has been shown at least once.
+ * DataStore key remains first_run_hint_seen for migration from v1.0.0.
  */
 data class UserSettings(
     val language: AppLanguage = AppLanguage.SYSTEM,
@@ -40,5 +43,5 @@ data class UserSettings(
     val weekdayFormat: WeekdayFormatOption = WeekdayFormatOption.EN,
     val exitOnUnplug: Boolean = false,
     val allowAutoSleep: Boolean = false,
-    val firstRunHintSeen: Boolean = false,
+    val settingsOpenedOnce: Boolean = false,
 )

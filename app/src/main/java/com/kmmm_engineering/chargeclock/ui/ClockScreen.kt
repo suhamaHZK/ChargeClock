@@ -61,12 +61,14 @@ fun ClockScreen(
     isCharging: Boolean,
     onSingleTap: () -> Unit,
     onOpenSettings: () -> Unit,
-    onHintDismissed: () -> Unit,
     onUnlockSliderVisibilityChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var showSlider by remember { mutableStateOf(false) }
+    // Lost-user temporary hint: show double_tap_hint for 5s after >=5 taps in 60s.
+    val recentTapAts = remember { ArrayDeque<Long>() }
+    var lostUserHintUntil by remember { mutableLongStateOf(0L) }
     var shiftX by remember { mutableIntStateOf(0) }
     var shiftY by remember { mutableIntStateOf(0) }
     val configuration = LocalConfiguration.current
@@ -97,6 +99,17 @@ fun ClockScreen(
         }
     }
 
+    // Clear temporary lost-user hint when its window ends.
+    LaunchedEffect(lostUserHintUntil) {
+        val until = lostUserHintUntil
+        if (until <= 0L) return@LaunchedEffect
+        val remaining = until - System.currentTimeMillis()
+        if (remaining > 0L) delay(remaining)
+        if (lostUserHintUntil == until) {
+            lostUserHintUntil = 0L
+        }
+    }
+
     val cal = remember(now) {
         Calendar.getInstance().apply { timeInMillis = now }
     }
@@ -116,13 +129,20 @@ fun ClockScreen(
                             showSlider = false
                         } else {
                             onSingleTap()
+                            val tapAt = System.currentTimeMillis()
+                            recentTapAts.addLast(tapAt)
+                            while (recentTapAts.isNotEmpty() && tapAt - recentTapAts.first() > 60_000L) {
+                                recentTapAts.removeFirst()
+                            }
+                            if (recentTapAts.size >= 5) {
+                                // Extend 5s from now if already visible.
+                                lostUserHintUntil = tapAt + 5_000L
+                            }
                         }
                     },
                     onDoubleTap = {
+                        // Open unlock slider only; do not mark settings-opened.
                         showSlider = true
-                        if (!settings.firstRunHintSeen) {
-                            onHintDismissed()
-                        }
                     },
                 )
             },
@@ -159,7 +179,9 @@ fun ClockScreen(
             )
         }
 
-        if (!settings.firstRunHintSeen && !showSlider) {
+        val showPersistentHint = !settings.settingsOpenedOnce && !showSlider
+        val showLostUserHint = !showSlider && lostUserHintUntil > System.currentTimeMillis()
+        if (showPersistentHint || showLostUserHint) {
             Text(
                 text = stringResource(R.string.double_tap_hint),
                 color = Color(0xFFAAAAAA),

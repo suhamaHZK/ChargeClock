@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import com.kmmm_engineering.chargeclock.discord.ThresholdAlertSnapshot
+import com.kmmm_engineering.chargeclock.widget.ClockWidgetUpdater
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
@@ -37,7 +38,8 @@ class SettingsRepository(private val context: Context) {
         val weekdayFormat = stringPreferencesKey("weekday_format")
         val exitOnUnplug = booleanPreferencesKey("exit_on_unplug")
         val allowAutoSleep = booleanPreferencesKey("allow_auto_sleep")
-        val firstRunHintSeen = booleanPreferencesKey("first_run_hint_seen")
+        /** Persisted as first_run_hint_seen; means settings opened at least once. */
+        val settingsOpenedOnce = booleanPreferencesKey("first_run_hint_seen")
         // Discord threshold-cross persistence (survives process death)
         val alertLastPercent = intPreferencesKey("alert_last_percent")
         val alertLastCharging = booleanPreferencesKey("alert_last_charging")
@@ -96,12 +98,14 @@ class SettingsRepository(private val context: Context) {
         } ?: WeekdayFormatOption.EN,
         exitOnUnplug = prefs[Keys.exitOnUnplug] ?: false,
         allowAutoSleep = prefs[Keys.allowAutoSleep] ?: false,
-        firstRunHintSeen = prefs[Keys.firstRunHintSeen] ?: false,
+        settingsOpenedOnce = prefs[Keys.settingsOpenedOnce] ?: false,
     )
 
     val settingsFlow: Flow<UserSettings> = context.dataStore.data.map { prefs ->
         prefsToSettings(prefs)
     }
+
+    suspend fun getSettingsOnce(): UserSettings = settingsFlow.first()
 
     suspend fun update(transform: (UserSettings) -> UserSettings) {
         context.dataStore.edit { prefs ->
@@ -124,8 +128,9 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.weekdayFormat] = next.weekdayFormat.name
             prefs[Keys.exitOnUnplug] = next.exitOnUnplug
             prefs[Keys.allowAutoSleep] = next.allowAutoSleep
-            prefs[Keys.firstRunHintSeen] = next.firstRunHintSeen
+            prefs[Keys.settingsOpenedOnce] = next.settingsOpenedOnce
         }
+        ClockWidgetUpdater.updateAll(context.applicationContext)
     }
 
     suspend fun setLanguage(v: AppLanguage) = update { it.copy(language = v) }
@@ -143,7 +148,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setWeekdayFormat(v: WeekdayFormatOption) = update { it.copy(weekdayFormat = v) }
     suspend fun setExitOnUnplug(v: Boolean) = update { it.copy(exitOnUnplug = v) }
     suspend fun setAllowAutoSleep(v: Boolean) = update { it.copy(allowAutoSleep = v) }
-    suspend fun markFirstRunHintSeen() = update { it.copy(firstRunHintSeen = true) }
+    suspend fun markSettingsOpenedOnce() = update { it.copy(settingsOpenedOnce = true) }
 
     suspend fun loadThresholdAlertSnapshot(): ThresholdAlertSnapshot {
         val prefs = context.dataStore.data.first()

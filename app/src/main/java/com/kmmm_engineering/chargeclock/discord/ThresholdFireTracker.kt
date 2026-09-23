@@ -3,14 +3,16 @@ package com.kmmm_engineering.chargeclock.discord
 /**
  * Threshold-cross Discord alerts.
  *
- * Fires only when transitioning across a threshold **while the app is observing**:
+ * Fires only when transitioning across a threshold:
  * - Discharge: previously above [dischargeThreshold], now ≤ it (while discharging)
  * - Charge: previously below [chargeThreshold], now ≥ it (while charging)
  *
- * Process start / cold start: [restore] always leaves the tracker unseeded, so the
- * first [check] seeds from the **current** battery **without firing**. Crossings that
- * happened while the process was dead are ignored (stale lastPercent is never used
- * for cross detection across process boundaries).
+ * Restore modes:
+ * - [restore]: forces unseeded so the first [check] seeds from the live battery without
+ *   treating a pre-death gap as a cross (legacy / cold-start quiet mode).
+ * - [restoreKeepingSeed]: if persisted lastPercent is valid and seeded, keeps seeded so a
+ *   cross between the last persisted sample and the current sample CAN fire (widget /
+ *   background polling via [ThresholdAlertEvaluator]).
  *
  * While running: real crosses fire once; leave the alert zone to re-arm; threshold
  * setting changes re-arm. OFF thresholds (-1) never fire. Empty webhook is handled
@@ -37,18 +39,32 @@ class ThresholdFireTracker {
 
     /**
      * Load persisted latch fields. Always forces [seeded]=false so the first [check]
-     * after process start re-seeds from the live battery without treating a
+     * after restore re-seeds from the live battery without treating a
      * pre-death lastPercent → current percent gap as a cross.
      */
     fun restore(snapshot: ThresholdAlertSnapshot) {
+        applySnapshotFields(snapshot)
+        // Quiet mode: never trust pre-death lastPercent for cross detection.
+        seeded = false
+    }
+
+    /**
+     * Load persisted latch fields. If [ThresholdAlertSnapshot.lastPercent] is valid and
+     * the snapshot was seeded, keep [seeded]=true so a cross since the last sample can fire.
+     * Used by background / widget polling.
+     */
+    fun restoreKeepingSeed(snapshot: ThresholdAlertSnapshot) {
+        applySnapshotFields(snapshot)
+        seeded = snapshot.seeded && snapshot.lastPercent >= 0
+    }
+
+    private fun applySnapshotFields(snapshot: ThresholdAlertSnapshot) {
         lastPercent = snapshot.lastPercent
         lastCharging = snapshot.lastCharging
         dischargeArmed = snapshot.dischargeArmed
         chargeArmed = snapshot.chargeArmed
         lastDischargeThreshold = snapshot.lastDischargeThreshold
         lastChargeThreshold = snapshot.lastChargeThreshold
-        // New process: never trust pre-death lastPercent for cross detection.
-        seeded = false
     }
 
     fun snapshot(): ThresholdAlertSnapshot = ThresholdAlertSnapshot(

@@ -15,8 +15,8 @@ android {
         applicationId = "com.kmmm_engineering.chargeclock"
         minSdk = 29
         targetSdk = 36
-        versionCode = 100
-        versionName = "1.0.0"
+        versionCode = 101
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -54,9 +54,14 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            // Play upload keystore when keystore.properties exists; otherwise
+            // debug key (same as historical *-release-debugsigned.apk sideloads).
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
-        // Optional lean debug for local testing (not default)
         debug {
             isMinifyEnabled = false
         }

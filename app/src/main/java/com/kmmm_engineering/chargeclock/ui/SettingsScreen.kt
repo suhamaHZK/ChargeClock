@@ -1,5 +1,7 @@
 package com.kmmm_engineering.chargeclock.ui
 
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.res.Configuration
 import android.view.LayoutInflater
 import android.view.ViewGroup
@@ -60,6 +62,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -75,6 +78,9 @@ import com.kmmm_engineering.chargeclock.data.SettingsRepository
 import com.kmmm_engineering.chargeclock.data.UserSettings
 import com.kmmm_engineering.chargeclock.data.WeekdayFormatOption
 import com.kmmm_engineering.chargeclock.discord.DiscordNotifier
+import com.kmmm_engineering.chargeclock.util.DiscordIconSaver
+import com.kmmm_engineering.chargeclock.widget.ClockWidgetCompactProvider
+import com.kmmm_engineering.chargeclock.widget.ClockWidgetFullProvider
 import com.larswerkman.holocolorpicker.ColorPicker
 import com.larswerkman.holocolorpicker.SVBar
 import kotlinx.coroutines.launch
@@ -89,6 +95,11 @@ fun SettingsScreen(
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    var showWidgetSizePicker by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val iconOkMsg = stringResource(R.string.discord_icon_save_ok)
+    val iconFailMsg = stringResource(R.string.discord_icon_save_fail)
+    val widgetUnsupportedMsg = stringResource(R.string.widget_pin_unsupported)
     var webhookDraft by remember(settings.discordWebhookUrl) {
         mutableStateOf(settings.discordWebhookUrl)
     }
@@ -202,6 +213,17 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(R.string.discord_test_send))
+            }
+            Button(
+                onClick = {
+                    scope.launch {
+                        val ok = DiscordIconSaver.saveToGallery(context)
+                        snackbarHostState.showSnackbar(if (ok) iconOkMsg else iconFailMsg)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.discord_icon_get))
             }
 
             SectionTitle(stringResource(R.string.discord_discharge))
@@ -323,6 +345,14 @@ fun SettingsScreen(
                 onCheckedChange = { scope.launch { repository.setAllowAutoSleep(it) } },
             )
 
+            SectionTitle(stringResource(R.string.widget_section))
+            Button(
+                onClick = { showWidgetSizePicker = true },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.widget_pin))
+            }
+
             SectionTitle(stringResource(R.string.credits_oss))
             Text(
                 text = stringResource(R.string.credits_holocolorpicker),
@@ -343,6 +373,48 @@ fun SettingsScreen(
                 scope.launch { repository.setTextColorArgb(argb) }
                 showColorPicker = false
             },
+        )
+    }
+
+
+    if (showWidgetSizePicker) {
+        AlertDialog(
+            onDismissRequest = { showWidgetSizePicker = false },
+            title = { Text(stringResource(R.string.widget_pin_pick_title)) },
+            text = {
+                Column {
+                    TextButton(
+                        onClick = {
+                            showWidgetSizePicker = false
+                            requestPinWidget(context, ClockWidgetCompactProvider::class.java) {
+                                scope.launch { snackbarHostState.showSnackbar(widgetUnsupportedMsg) }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.widget_pin_compact))
+                    }
+                    TextButton(
+                        onClick = {
+                            showWidgetSizePicker = false
+                            requestPinWidget(context, ClockWidgetFullProvider::class.java) {
+                                scope.launch { snackbarHostState.showSnackbar(widgetUnsupportedMsg) }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.widget_pin_full))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showWidgetSizePicker = false }) {
+                    Text(stringResource(R.string.color_picker_cancel))
+                }
+            },
+            containerColor = Color(0xFF1E1E1E),
+            titleContentColor = Color.White,
+            textContentColor = Color.White,
         )
     }
 }
@@ -663,4 +735,19 @@ private fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean
         Text(label, color = Color.White, modifier = Modifier.weight(1f))
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
+}
+
+
+private fun requestPinWidget(
+    context: android.content.Context,
+    provider: Class<*>,
+    onUnsupported: () -> Unit,
+) {
+    val mgr = AppWidgetManager.getInstance(context)
+    if (!mgr.isRequestPinAppWidgetSupported) {
+        onUnsupported()
+        return
+    }
+    val ok = mgr.requestPinAppWidget(ComponentName(context, provider), null, null)
+    if (!ok) onUnsupported()
 }

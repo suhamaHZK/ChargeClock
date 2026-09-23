@@ -3,6 +3,7 @@ package com.kmmm_engineering.chargeclock
 import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.view.WindowManager
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -13,7 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.core.os.LocaleListCompat
@@ -28,17 +29,13 @@ import com.kmmm_engineering.chargeclock.battery.BatteryMonitor
 import com.kmmm_engineering.chargeclock.data.AppLanguage
 import com.kmmm_engineering.chargeclock.data.LandscapeMode
 import com.kmmm_engineering.chargeclock.data.UserSettings
-import com.kmmm_engineering.chargeclock.discord.DiscordNotifier
-import com.kmmm_engineering.chargeclock.discord.ThresholdFireTracker
+import com.kmmm_engineering.chargeclock.discord.ThresholdAlertEvaluator
 import com.kmmm_engineering.chargeclock.ui.ClockScreen
 import com.kmmm_engineering.chargeclock.ui.SettingsScreen
 import com.kmmm_engineering.chargeclock.ui.theme.ChargeClockTheme
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
-
-    private val thresholdTracker = ThresholdFireTracker()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,15 +58,6 @@ class MainActivity : AppCompatActivity() {
             )
             val battery = batteryState.value
                 ?: com.kmmm_engineering.chargeclock.battery.BatteryStatus(0, false, false)
-            val scope = rememberCoroutineScope()
-
-            // Restore threshold-alert latch from DataStore once; restore forces re-seed on first check.
-            var alertStateReady by remember { mutableStateOf(false) }
-            LaunchedEffect(Unit) {
-                thresholdTracker.restore(repo.loadThresholdAlertSnapshot())
-                alertStateReady = true
-            }
-
             // Apply language override (AppCompat per-app locales). Activity recreates on change.
             LaunchedEffect(settingsState.value?.language) {
                 val language = settingsState.value?.language ?: return@LaunchedEffect
@@ -99,7 +87,8 @@ class MainActivity : AppCompatActivity() {
             var lastInteractionAt by remember { mutableStateOf(System.currentTimeMillis()) }
             // Settings screen: null = readable (system); non-null = live idle-slider preview
             var settingsBrightnessPreview by remember { mutableStateOf<Float?>(null) }
-            var showSettings by remember { mutableStateOf(false) }
+            // Survive Activity recreate from AppCompatDelegate.setApplicationLocales
+            var showSettings by rememberSaveable { mutableStateOf(false) }
             // Anti-misoperation unlock slider visible on clock → readable brightness
             var unlockSliderVisible by remember { mutableStateOf(false) }
             // Only poll while resumed so onPause system-brightness restore is not fought
@@ -199,40 +188,25 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // Discord thresholds — notify only on crossing, never on cold start while already
-            // on the alert side. Wait for DataStore settings + real battery + restored latch.
+            // Discord thresholds — shared helper with widget path (DataStore latch).
+            // restoreKeepingSeed: cross since last persisted sample can fire.
             LaunchedEffect(
                 batteryState.value,
                 settingsState.value,
-                alertStateReady,
                 battery.percent,
                 battery.isCharging,
                 settings.discordDischargeThreshold,
                 settings.discordChargeThreshold,
                 settings.discordWebhookUrl,
             ) {
-                if (!alertStateReady) return@LaunchedEffect
                 if (settingsState.value == null) return@LaunchedEffect
                 if (batteryState.value == null) return@LaunchedEffect
-
-                val kind = thresholdTracker.check(
+                ThresholdAlertEvaluator.evaluateAndNotify(
+                    context = applicationContext,
                     percent = battery.percent,
                     isCharging = battery.isCharging,
-                    dischargeThreshold = settings.discordDischargeThreshold,
-                    chargeThreshold = settings.discordChargeThreshold,
+                    settings = settings,
                 )
-                // Persist latch / last percent so process death does not re-arm spuriously.
-                repo.saveThresholdAlertSnapshot(thresholdTracker.snapshot())
-
-                if (kind != null && settings.discordWebhookUrl.isNotBlank()) {
-                    val msg = when (kind) {
-                        "discharge" -> getString(R.string.discord_discharge_msg, battery.percent)
-                        else -> getString(R.string.discord_charge_msg, battery.percent)
-                    }
-                    scope.launch {
-                        DiscordNotifier.send(settings.discordWebhookUrl, msg)
-                    }
-                }
             }
 
             // Recompose strings when application locales / configuration update
@@ -241,17 +215,28 @@ class MainActivity : AppCompatActivity() {
 
             key(localeKey) {
                 ChargeClockTheme {
+                                        val closeSettings: () -> Unit = {
+                        settingsBrightnessPreview = null
+                        showSettings = false
+                        markInteraction()
+                        hideSystemBars()
+                    }
+                    BackHandler(enabled = showSettings) {
+                        closeSettings()
+                    }
+
                     when {
                         showSettings -> {
+                            // Mark only when Settings is actually shown (not on double-tap alone).
+                            LaunchedEffect(Unit) {
+                                if (!settings.settingsOpenedOnce) {
+                                    repo.markSettingsOpenedOnce()
+                                }
+                            }
                             SettingsScreen(
                                 settings = settings,
                                 repository = repo,
-                                onBack = {
-                                    settingsBrightnessPreview = null
-                                    showSettings = false
-                                    markInteraction()
-                                    hideSystemBars()
-                                },
+                                onBack = closeSettings,
                                 onIdleBrightnessPreview = { preview ->
                                     settingsBrightnessPreview = preview
                                 },
@@ -270,9 +255,6 @@ class MainActivity : AppCompatActivity() {
                                 unlockSliderVisible = false
                                 settingsBrightnessPreview = null
                                 showSettings = true
-                            },
-                            onHintDismissed = {
-                                scope.launch { repo.markFirstRunHintSeen() }
                             },
                             onUnlockSliderVisibilityChange = { visible ->
                                 if (visible) markInteraction()

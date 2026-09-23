@@ -51,6 +51,17 @@
     <string name="scale_xlarge">特大</string>
     <string name="color_picker_ok">OK</string>
     <string name="color_picker_cancel">キャンセル</string>
+    <string name="discord_icon_get">Webhook用のアイコンを入手</string>
+    <string name="discord_icon_save_ok">アイコンをDCIMに保存しました</string>
+    <string name="discord_icon_save_fail">アイコンの保存に失敗しました</string>
+    <string name="widget_section">ホーム画面ウィジェット</string>
+    <string name="widget_pin">ウィジェットを設置</string>
+    <string name="widget_pin_pick_title">ウィジェットサイズを選択</string>
+    <string name="widget_pin_compact">コンパクト（2x1）</string>
+    <string name="widget_pin_full">フル（4x2）</string>
+    <string name="widget_pin_unsupported">ピン留めに非対応です。ランチャーのウィジェット一覧から追加してください。</string>
+    <string name="widget_description_compact">充電時計 - 時刻とバッテリー</string>
+    <string name="widget_description_full">充電時計 - 日付・時刻・バッテリー</string>
     <string name="credits_oss">クレジット / オープンソース</string>
     <string name="credits_holocolorpicker">HoloColorPicker — Lars Werkman — Apache License 2.0 — https://github.com/LarsWerkman/HoloColorPicker</string>
 </resources>
