@@ -3,9 +3,12 @@ package com.kmmm_engineering.chargeclock.discord
 /**
  * Threshold-cross Discord alerts.
  *
- * Fires only when transitioning across a threshold:
+ * Fires only when entering the alert zone from outside by percent:
  * - Discharge: previously above [dischargeThreshold], now ≤ it (while discharging)
  * - Charge: previously below [chargeThreshold], now ≥ it (while charging)
+ *
+ * Plug/unplug at the same percent already in/out of the zone does not fire.
+ * Jumps that skip the exact threshold (e.g. 79→81, 31→29) still fire.
  *
  * Restore modes:
  * - [restore]: forces unseeded so the first [check] seeds from the live battery without
@@ -108,17 +111,13 @@ class ThresholdFireTracker {
             if (dischargeThreshold < 0) {
                 dischargeArmed = true
             } else if (percent <= dischargeThreshold) {
-                if (dischargeArmed) {
-                    // Crossing into (or re-entering while armed) the discharge alert zone.
-                    // Require that we had a prior reading above the threshold when possible.
-                    val crossed = lastPercent < 0 || lastPercent > dischargeThreshold || lastCharging
-                    if (crossed) {
-                        fire = "discharge"
-                        dischargeArmed = false
-                    } else {
-                        // Still on alert side without having left — stay quiet.
-                        dischargeArmed = false
-                    }
+                // Fire only when entering the zone from outside by percent.
+                if (dischargeArmed && lastPercent > dischargeThreshold) {
+                    fire = "discharge"
+                    dischargeArmed = false
+                } else {
+                    // Already on alert side (e.g. plug/unplug at same %) — stay quiet.
+                    dischargeArmed = false
                 }
             } else {
                 dischargeArmed = true
@@ -128,14 +127,13 @@ class ThresholdFireTracker {
             if (chargeThreshold < 0) {
                 chargeArmed = true
             } else if (percent >= chargeThreshold) {
-                if (chargeArmed) {
-                    val crossed = lastPercent < 0 || lastPercent < chargeThreshold || !lastCharging
-                    if (crossed) {
-                        fire = "charge"
-                        chargeArmed = false
-                    } else {
-                        chargeArmed = false
-                    }
+                // Fire only when entering the zone from outside by percent.
+                if (chargeArmed && lastPercent < chargeThreshold) {
+                    fire = "charge"
+                    chargeArmed = false
+                } else {
+                    // Already on alert side (e.g. plug/unplug at same %) — stay quiet.
+                    chargeArmed = false
                 }
             } else {
                 chargeArmed = true

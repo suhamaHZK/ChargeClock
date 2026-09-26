@@ -143,4 +143,43 @@ class ThresholdFireTrackerTest {
         // Invalid lastPercent → treat as unseeded
         assertNull(t.check(percent = 15, isCharging = false, dischargeThreshold = 20, chargeThreshold = -1))
     }
+
+    @Test
+    fun plugUnplugAtChargeThreshold_doesNotFire() {
+        val t = ThresholdFireTracker()
+        // Seed while already at charge threshold: quiet
+        assertNull(t.check(percent = 80, isCharging = true, dischargeThreshold = -1, chargeThreshold = 80))
+        // Unplug then replug at the same percent already in zone: must not fire
+        assertNull(t.check(percent = 80, isCharging = false, dischargeThreshold = -1, chargeThreshold = 80))
+        assertNull(t.check(percent = 80, isCharging = true, dischargeThreshold = -1, chargeThreshold = 80))
+        assertNull(t.check(percent = 80, isCharging = false, dischargeThreshold = -1, chargeThreshold = 80))
+        assertNull(t.check(percent = 80, isCharging = true, dischargeThreshold = -1, chargeThreshold = 80))
+    }
+
+    @Test
+    fun plugUnplugAtDischargeThreshold_doesNotFire() {
+        val t = ThresholdFireTracker()
+        // Seed while already at discharge threshold: quiet
+        assertNull(t.check(percent = 30, isCharging = false, dischargeThreshold = 30, chargeThreshold = -1))
+        // Plug then unplug at the same percent already in zone: must not fire
+        assertNull(t.check(percent = 30, isCharging = true, dischargeThreshold = 30, chargeThreshold = -1))
+        assertNull(t.check(percent = 30, isCharging = false, dischargeThreshold = 30, chargeThreshold = -1))
+        assertNull(t.check(percent = 30, isCharging = true, dischargeThreshold = 30, chargeThreshold = -1))
+        assertNull(t.check(percent = 30, isCharging = false, dischargeThreshold = 30, chargeThreshold = -1))
+    }
+
+    @Test
+    fun chargeJumpAcrossThreshold_fires() {
+        val t = ThresholdFireTracker()
+        assertNull(t.check(percent = 79, isCharging = true, dischargeThreshold = -1, chargeThreshold = 80))
+        assertEquals("charge", t.check(percent = 81, isCharging = true, dischargeThreshold = -1, chargeThreshold = 80))
+    }
+
+    @Test
+    fun dischargeJumpAcrossThreshold_fires() {
+        val t = ThresholdFireTracker()
+        assertNull(t.check(percent = 31, isCharging = false, dischargeThreshold = 30, chargeThreshold = -1))
+        assertEquals("discharge", t.check(percent = 29, isCharging = false, dischargeThreshold = 30, chargeThreshold = -1))
+    }
+
 }
