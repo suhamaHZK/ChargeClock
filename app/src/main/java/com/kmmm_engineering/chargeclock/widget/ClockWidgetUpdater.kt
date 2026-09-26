@@ -18,6 +18,7 @@ import android.widget.RemoteViews
 import com.kmmm_engineering.chargeclock.ChargeClockApp
 import com.kmmm_engineering.chargeclock.MainActivity
 import com.kmmm_engineering.chargeclock.R
+import com.kmmm_engineering.chargeclock.data.ClockTheme
 import com.kmmm_engineering.chargeclock.data.UserSettings
 import com.kmmm_engineering.chargeclock.discord.ThresholdAlertEvaluator
 import com.kmmm_engineering.chargeclock.ui.batteryFilledBlocks
@@ -31,19 +32,29 @@ import java.util.Calendar
 /**
  * Builds and pushes RemoteViews for both widget sizes.
  *
- * Time display uses [android.widget.TextClock] so minutes flip in the widget host without
- * the app process; this updater no longer pushes time via setTextViewText.
- * App [UserSettings.use24Hour] is forced by setting both format12Hour and format24Hour to
- * the same pattern (TextClock otherwise follows the system 12/24 setting).
+ * **DEFAULT theme:** time uses [android.widget.TextClock] so minutes flip in the
+ * widget host without the app process. App [UserSettings.use24Hour] is forced by
+ * setting both format12Hour and format24Hour to the same pattern.
  *
- * Update cadence (minSdk 29) — still needed for date / battery / Discord:
+ * **CLASSIC_DIGITAL / SEG14_DIGITAL:** custom DSEG fonts cannot be applied via
+ * `android:fontFamily` on RemoteViews. Time / date / battery (/ AM/PM) are drawn
+ * as Bitmaps into ImageViews via [WidgetTextBitmap]. These digital widgets follow
+ * the alarm cadence ([WidgetAlarmScheduler] at each :00 boundary, plus
+ * [WidgetTimeTickRegistrar] TIME_TICK while the process is alive) — not TextClock
+ * host ticks. Bitmap time is redrawn on every update so it stays in sync with
+ * those alarms. Do not use TextView-for-time as the primary clock on digital themes
+ * (minute skew vs OS was observed).
+ *
+ * Update cadence (minSdk 29) — date / battery / Discord / digital time:
  * - android:updatePeriodMillis is floored to ~30 minutes by the system — safety net only.
- * - Primary: [WidgetAlarmScheduler] uses AlarmManager.setExactAndAllowWhileIdle at each
- *   minute boundary (SCHEDULE_EXACT_ALARM). Falls back to setAndAllowWhileIdle if exact
- *   alarms are denied. Also refreshes on TIME_CHANGED / TIMEZONE_CHANGED / BOOT_COMPLETED
- *   and when settings change via [updateAll].
- * - While the process is alive, [WidgetTimeTickRegistrar] also listens for
- *   ACTION_TIME_TICK (dynamic only; cannot be in the manifest).
+ * - Primary (cold process): [WidgetAlarmScheduler] — interactive screen →
+ *   AlarmManager.setExact at each minute boundary; screen off → setAlarmClock
+ *   (Doze-safe) with while-idle fallbacks. Some OEMs delay minute setAlarmClock
+ *   (~20–35s); interactive setExact is the on-time path for DSEG. Also refreshes
+ *   on TIME_CHANGED / TIMEZONE_CHANGED / BOOT_COMPLETED and settings via [updateAll].
+ * - While the process is alive, [WidgetTimeTickRegistrar] listens for
+ *   ACTION_TIME_TICK and arms a Handler to the next minute boundary (precision
+ *   backup when AlarmManager is late). Both run updateAll off-main.
  * - After each [updateAll], Discord battery thresholds are evaluated via
  *   [com.kmmm_engineering.chargeclock.discord.ThresholdAlertEvaluator].
  * Widgets never show seconds; text size scales to widget bounds (ignores displayScale).
@@ -187,14 +198,153 @@ object ClockWidgetUpdater {
     private fun withoutSeconds(settings: UserSettings): UserSettings =
         settings.copy(showSeconds = false)
 
+    private fun isDigitalTheme(theme: ClockTheme): Boolean =
+        theme == ClockTheme.CLASSIC_DIGITAL || theme == ClockTheme.SEG14_DIGITAL
+
+    private fun compactLayoutRes(theme: ClockTheme): Int = when (theme) {
+        ClockTheme.DEFAULT -> R.layout.widget_clock_compact
+        ClockTheme.CLASSIC_DIGITAL -> R.layout.widget_clock_compact_classic
+        ClockTheme.SEG14_DIGITAL -> R.layout.widget_clock_compact_seg14
+    }
+
+    private fun fullLayoutRes(theme: ClockTheme): Int = when (theme) {
+        ClockTheme.DEFAULT -> R.layout.widget_clock_full
+        ClockTheme.CLASSIC_DIGITAL -> R.layout.widget_clock_full_classic
+        ClockTheme.SEG14_DIGITAL -> R.layout.widget_clock_full_seg14
+    }
+
+    private fun spToPx(context: Context, sp: Float): Float =
+        TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP,
+            sp,
+            context.resources.displayMetrics,
+        )
+
     /**
-     * Force app 12/24 preference onto TextClock: both format slots get the same pattern so
-     * the system 12/24 setting cannot pick a different style.
+     * DEFAULT only: force app 12/24 preference onto TextClock.
+     * Must not be called for digital themes (widget_time is an ImageView).
      */
     private fun applyWidgetTimeFormats(views: RemoteViews, settings: UserSettings) {
+        if (settings.clockTheme != ClockTheme.DEFAULT) return
         val pattern = if (settings.use24Hour) "HH:mm" else "h:mm a"
         views.setCharSequence(R.id.widget_time, "setFormat12Hour", pattern)
         views.setCharSequence(R.id.widget_time, "setFormat24Hour", pattern)
+    }
+
+    /** Classic digital: AM/PM as DSEG14 bitmap, or hide for 24h. */
+    private fun applyClassicAmPmBitmap(
+        context: Context,
+        views: RemoteViews,
+        settings: UserSettings,
+        amPm: String?,
+        amPmSp: Float,
+        color: Int,
+    ) {
+        if (settings.clockTheme != ClockTheme.CLASSIC_DIGITAL) return
+        if (amPm == null || settings.use24Hour) {
+            views.setViewVisibility(R.id.widget_ampm, View.GONE)
+            return
+        }
+        val bmp = WidgetTextBitmap.createTextBitmap(
+            text = amPm,
+            typeface = WidgetTextBitmap.typefaceDseg14(context),
+            textSizePx = spToPx(context, amPmSp),
+            color = color,
+        )
+        views.setImageViewBitmap(R.id.widget_ampm, bmp)
+        views.setViewVisibility(R.id.widget_ampm, View.VISIBLE)
+    }
+
+    /**
+     * Draw time (/ AM/PM) bitmaps for digital themes. Redrawn on every widget update
+     * so displayed time matches [WidgetAlarmScheduler] / TIME_TICK cadence.
+     */
+    private fun applyDigitalTimeBitmaps(
+        context: Context,
+        views: RemoteViews,
+        settings: UserSettings,
+        timeSp: Float,
+        amPmSp: Float,
+        color: Int,
+    ) {
+        val cal = Calendar.getInstance()
+        val parts = Formatters.formatTimeParts(cal, withoutSeconds(settings))
+        val timePx = spToPx(context, timeSp)
+        when (settings.clockTheme) {
+            ClockTheme.CLASSIC_DIGITAL -> {
+                // Digits + ':' only → DSEG7 (AM/PM is a separate ImageView).
+                val bmp = WidgetTextBitmap.createTextBitmap(
+                    text = parts.hourMinute,
+                    typeface = WidgetTextBitmap.typefaceDseg7(context),
+                    textSizePx = timePx,
+                    color = color,
+                )
+                views.setImageViewBitmap(R.id.widget_time, bmp)
+                applyClassicAmPmBitmap(context, views, settings, parts.amPm, amPmSp, color)
+            }
+            ClockTheme.SEG14_DIGITAL -> {
+                // Match prior TextClock "h:mm a" / "HH:mm": AM/PM included in time string.
+                val timeStr = if (parts.amPm != null) {
+                    "${parts.hourMinute} ${parts.amPm}"
+                } else {
+                    parts.hourMinute
+                }
+                val bmp = WidgetTextBitmap.createTextBitmap(
+                    text = timeStr,
+                    typeface = WidgetTextBitmap.typefaceDseg14(context),
+                    textSizePx = timePx,
+                    color = color,
+                )
+                views.setImageViewBitmap(R.id.widget_time, bmp)
+            }
+            ClockTheme.DEFAULT -> Unit
+        }
+    }
+
+    private fun digitalBatteryBitmap(
+        context: Context,
+        theme: ClockTheme,
+        percent: Int,
+        textSizePx: Float,
+        color: Int,
+    ): Bitmap {
+        val text = context.getString(R.string.battery_percent, percent)
+        return when (theme) {
+            ClockTheme.CLASSIC_DIGITAL ->
+                WidgetTextBitmap.createMixedClassicBitmap(context, text, textSizePx, color)
+            ClockTheme.SEG14_DIGITAL ->
+                WidgetTextBitmap.createTextBitmap(
+                    text,
+                    WidgetTextBitmap.typefaceDseg14(context),
+                    textSizePx,
+                    color,
+                )
+            ClockTheme.DEFAULT ->
+                error("digitalBatteryBitmap is for digital themes only")
+        }
+    }
+
+    private fun digitalDateBitmap(
+        context: Context,
+        settings: UserSettings,
+        textSizePx: Float,
+        color: Int,
+    ): Bitmap {
+        val cal = Calendar.getInstance()
+        val dateText = Formatters.formatDate(cal, withoutSeconds(settings))
+        return when (settings.clockTheme) {
+            ClockTheme.CLASSIC_DIGITAL ->
+                WidgetTextBitmap.createMixedClassicBitmap(context, dateText, textSizePx, color)
+            ClockTheme.SEG14_DIGITAL ->
+                WidgetTextBitmap.createTextBitmap(
+                    dateText,
+                    WidgetTextBitmap.typefaceDseg14(context),
+                    textSizePx,
+                    color,
+                )
+            ClockTheme.DEFAULT ->
+                error("digitalDateBitmap is for digital themes only")
+        }
     }
 
     private fun buildCompact(
@@ -203,7 +353,7 @@ object ClockWidgetUpdater {
         percent: Int,
         options: Bundle,
     ): RemoteViews {
-        val views = RemoteViews(context.packageName, R.layout.widget_clock_compact)
+        val views = RemoteViews(context.packageName, compactLayoutRes(settings.clockTheme))
         val color = (settings.textColorArgb and 0xFFFFFFFFL).toInt()
         val minH = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 40)
         val timeSp = when {
@@ -212,12 +362,28 @@ object ClockWidgetUpdater {
             else -> 22f
         }
         val battSp = (timeSp * 0.5f).coerceAtLeast(11f)
-        applyWidgetTimeFormats(views, settings)
-        views.setTextColor(R.id.widget_time, color)
-        views.setTextViewTextSize(R.id.widget_time, TypedValue.COMPLEX_UNIT_SP, timeSp)
-        views.setTextViewText(R.id.widget_battery, context.getString(R.string.battery_percent, percent))
-        views.setTextColor(R.id.widget_battery, color)
-        views.setTextViewTextSize(R.id.widget_battery, TypedValue.COMPLEX_UNIT_SP, battSp)
+        val amPmSp = (timeSp * 0.45f).coerceAtLeast(10f)
+
+        if (isDigitalTheme(settings.clockTheme)) {
+            applyDigitalTimeBitmaps(context, views, settings, timeSp, amPmSp, color)
+            views.setImageViewBitmap(
+                R.id.widget_battery,
+                digitalBatteryBitmap(
+                    context,
+                    settings.clockTheme,
+                    percent,
+                    spToPx(context, battSp),
+                    color,
+                ),
+            )
+        } else {
+            applyWidgetTimeFormats(views, settings)
+            views.setTextColor(R.id.widget_time, color)
+            views.setTextViewTextSize(R.id.widget_time, TypedValue.COMPLEX_UNIT_SP, timeSp)
+            views.setTextViewText(R.id.widget_battery, context.getString(R.string.battery_percent, percent))
+            views.setTextColor(R.id.widget_battery, color)
+            views.setTextViewTextSize(R.id.widget_battery, TypedValue.COMPLEX_UNIT_SP, battSp)
+        }
         return views
     }
 
@@ -228,11 +394,8 @@ object ClockWidgetUpdater {
         charging: Boolean,
         options: Bundle,
     ): RemoteViews {
-        val views = RemoteViews(context.packageName, R.layout.widget_clock_full)
+        val views = RemoteViews(context.packageName, fullLayoutRes(settings.clockTheme))
         val color = (settings.textColorArgb and 0xFFFFFFFFL).toInt()
-        val cal = Calendar.getInstance()
-        val ws = withoutSeconds(settings)
-        val dateText = Formatters.formatDate(cal, ws)
         val minH = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 110)
         val minW = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
         val scale = when {
@@ -240,15 +403,41 @@ object ClockWidgetUpdater {
             minH >= 120 -> 1.0f
             else -> 0.85f
         }
-        views.setTextViewText(R.id.widget_date, dateText)
-        views.setTextColor(R.id.widget_date, color)
-        views.setTextViewTextSize(R.id.widget_date, TypedValue.COMPLEX_UNIT_SP, 14f * scale)
-        applyWidgetTimeFormats(views, settings)
-        views.setTextColor(R.id.widget_time, color)
-        views.setTextViewTextSize(R.id.widget_time, TypedValue.COMPLEX_UNIT_SP, 36f * scale)
-        views.setTextViewText(R.id.widget_battery, context.getString(R.string.battery_percent, percent))
-        views.setTextColor(R.id.widget_battery, color)
-        views.setTextViewTextSize(R.id.widget_battery, TypedValue.COMPLEX_UNIT_SP, 20f * scale)
+        val dateSp = 14f * scale
+        val timeSp = 36f * scale
+        val amPmSp = 18f * scale
+        val battSp = 20f * scale
+
+        if (isDigitalTheme(settings.clockTheme)) {
+            views.setImageViewBitmap(
+                R.id.widget_date,
+                digitalDateBitmap(context, settings, spToPx(context, dateSp), color),
+            )
+            applyDigitalTimeBitmaps(context, views, settings, timeSp, amPmSp, color)
+            views.setImageViewBitmap(
+                R.id.widget_battery,
+                digitalBatteryBitmap(
+                    context,
+                    settings.clockTheme,
+                    percent,
+                    spToPx(context, battSp),
+                    color,
+                ),
+            )
+        } else {
+            val cal = Calendar.getInstance()
+            val dateText = Formatters.formatDate(cal, withoutSeconds(settings))
+            views.setTextViewText(R.id.widget_date, dateText)
+            views.setTextColor(R.id.widget_date, color)
+            views.setTextViewTextSize(R.id.widget_date, TypedValue.COMPLEX_UNIT_SP, dateSp)
+            applyWidgetTimeFormats(views, settings)
+            views.setTextColor(R.id.widget_time, color)
+            views.setTextViewTextSize(R.id.widget_time, TypedValue.COMPLEX_UNIT_SP, timeSp)
+            views.setTextViewText(R.id.widget_battery, context.getString(R.string.battery_percent, percent))
+            views.setTextColor(R.id.widget_battery, color)
+            views.setTextViewTextSize(R.id.widget_battery, TypedValue.COMPLEX_UNIT_SP, battSp)
+        }
+
         views.setViewVisibility(R.id.widget_bolt, if (charging) View.VISIBLE else View.GONE)
         views.setInt(R.id.widget_bolt, "setColorFilter", color)
 

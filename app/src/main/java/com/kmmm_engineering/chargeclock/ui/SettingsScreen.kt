@@ -68,8 +68,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.kmmm_engineering.chargeclock.BuildConfig
 import com.kmmm_engineering.chargeclock.R
 import com.kmmm_engineering.chargeclock.data.AppLanguage
+import com.kmmm_engineering.chargeclock.data.ClockTheme
 import com.kmmm_engineering.chargeclock.data.DateFormatOption
 import com.kmmm_engineering.chargeclock.data.DisplayScale
 import com.kmmm_engineering.chargeclock.data.LandscapeMode
@@ -174,6 +176,27 @@ fun SettingsScreen(
                     onIdleBrightnessPreview(null)
                 },
                 valueRange = 0.01f..0.35f,
+            )
+
+            SectionTitle(stringResource(R.string.clock_theme))
+            val themeDefault = stringResource(R.string.clock_theme_default)
+            val themeClassic = stringResource(R.string.clock_theme_classic_digital)
+            val themeSeg14 = stringResource(R.string.clock_theme_seg14_digital)
+            SimpleDropdown(
+                options = listOf(
+                    ClockTheme.DEFAULT to themeDefault,
+                    ClockTheme.CLASSIC_DIGITAL to themeClassic,
+                    ClockTheme.SEG14_DIGITAL to themeSeg14,
+                ),
+                selected = settings.clockTheme,
+                labelOf = { opt ->
+                    when (opt) {
+                        ClockTheme.DEFAULT -> themeDefault
+                        ClockTheme.CLASSIC_DIGITAL -> themeClassic
+                        ClockTheme.SEG14_DIGITAL -> themeSeg14
+                    }
+                },
+                onSelect = { opt -> scope.launch { repository.setClockTheme(opt) } },
             )
 
             SectionTitle(stringResource(R.string.text_color))
@@ -309,29 +332,31 @@ fun SettingsScreen(
                 }
             }
 
-            SectionTitle(stringResource(R.string.weekday_format))
-            val weekdayEn = stringResource(R.string.weekday_en)
-            val weekdayJa = stringResource(R.string.weekday_ja)
-            val weekdayTw = stringResource(R.string.weekday_tw)
-            val weekdayCn = stringResource(R.string.weekday_cn)
-            SimpleDropdown(
-                options = listOf(
-                    WeekdayFormatOption.EN to weekdayEn,
-                    WeekdayFormatOption.JA to weekdayJa,
-                    WeekdayFormatOption.TW to weekdayTw,
-                    WeekdayFormatOption.CN to weekdayCn,
-                ),
-                selected = settings.weekdayFormat,
-                labelOf = { opt ->
-                    when (opt) {
-                        WeekdayFormatOption.EN -> weekdayEn
-                        WeekdayFormatOption.JA -> weekdayJa
-                        WeekdayFormatOption.TW -> weekdayTw
-                        WeekdayFormatOption.CN -> weekdayCn
-                    }
-                },
-                onSelect = { opt -> scope.launch { repository.setWeekdayFormat(opt) } },
-            )
+            if (!settings.forcesEnglishWeekday) {
+                SectionTitle(stringResource(R.string.weekday_format))
+                val weekdayEn = stringResource(R.string.weekday_en)
+                val weekdayJa = stringResource(R.string.weekday_ja)
+                val weekdayTw = stringResource(R.string.weekday_tw)
+                val weekdayCn = stringResource(R.string.weekday_cn)
+                SimpleDropdown(
+                    options = listOf(
+                        WeekdayFormatOption.EN to weekdayEn,
+                        WeekdayFormatOption.JA to weekdayJa,
+                        WeekdayFormatOption.TW to weekdayTw,
+                        WeekdayFormatOption.CN to weekdayCn,
+                    ),
+                    selected = settings.weekdayFormat,
+                    labelOf = { opt ->
+                        when (opt) {
+                            WeekdayFormatOption.EN -> weekdayEn
+                            WeekdayFormatOption.JA -> weekdayJa
+                            WeekdayFormatOption.TW -> weekdayTw
+                            WeekdayFormatOption.CN -> weekdayCn
+                        }
+                    },
+                    onSelect = { opt -> scope.launch { repository.setWeekdayFormat(opt) } },
+                )
+            }
 
             SwitchRow(
                 label = stringResource(R.string.exit_on_unplug),
@@ -357,6 +382,23 @@ fun SettingsScreen(
             Text(
                 text = stringResource(R.string.credits_holocolorpicker),
                 color = Color(0xFFAAAAAA),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.credits_dseg),
+                color = Color(0xFFAAAAAA),
+                style = MaterialTheme.typography.bodySmall,
+            )
+
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = if (BuildConfig.APP_REV.isNotEmpty()) {
+                    "${BuildConfig.VERSION_NAME} rev${BuildConfig.APP_REV}"
+                } else {
+                    BuildConfig.VERSION_NAME
+                },
+                color = Color(0xFF888888),
                 style = MaterialTheme.typography.bodySmall,
             )
 

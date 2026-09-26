@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Map every style/weight to the single Italic TTF so RemoteViews/host
+     matching never falls back to system sans when requesting normal weight. -->
+<font-family xmlns:android="http://schemas.android.com/apk/res/android">
+    <font
+        android:fontStyle="normal"
+        android:fontWeight="400"
+        android:font="@font/dseg14_classic_mini_italic_file" />
+    <font
+        android:fontStyle="italic"
+        android:fontWeight="400"
+        android:font="@font/dseg14_classic_mini_italic_file" />
+    <font
+        android:fontStyle="normal"
+        android:fontWeight="700"
+        android:font="@font/dseg14_classic_mini_italic_file" />
+    <font
+        android:fontStyle="italic"
+        android:fontWeight="700"
+        android:font="@font/dseg14_classic_mini_italic_file" />
+</font-family>

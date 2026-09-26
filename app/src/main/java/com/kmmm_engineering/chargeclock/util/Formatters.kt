@@ -51,7 +51,7 @@ object Formatters {
             }
         }
         val wd = cal.get(Calendar.DAY_OF_WEEK) - 1
-        val weekday = when (settings.weekdayFormat) {
+        val weekday = when (settings.effectiveWeekdayFormat) {
             WeekdayFormatOption.EN -> weekdayEn[wd]
             WeekdayFormatOption.JA -> weekdayJa[wd]
             WeekdayFormatOption.TW -> weekdayTw[wd]

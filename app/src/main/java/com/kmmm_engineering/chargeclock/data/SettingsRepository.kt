@@ -36,6 +36,7 @@ class SettingsRepository(private val context: Context) {
         val dateFormat = stringPreferencesKey("date_format")
         val monthFormat = stringPreferencesKey("month_format")
         val weekdayFormat = stringPreferencesKey("weekday_format")
+        val clockTheme = stringPreferencesKey("clock_theme")
         val exitOnUnplug = booleanPreferencesKey("exit_on_unplug")
         val allowAutoSleep = booleanPreferencesKey("allow_auto_sleep")
         /** Persisted as first_run_hint_seen; means settings opened at least once. */
@@ -96,6 +97,9 @@ class SettingsRepository(private val context: Context) {
         weekdayFormat = prefs[Keys.weekdayFormat]?.let {
             runCatching { WeekdayFormatOption.valueOf(it) }.getOrDefault(WeekdayFormatOption.EN)
         } ?: WeekdayFormatOption.EN,
+        clockTheme = prefs[Keys.clockTheme]?.let {
+            runCatching { ClockTheme.valueOf(it) }.getOrDefault(ClockTheme.DEFAULT)
+        } ?: ClockTheme.DEFAULT,
         exitOnUnplug = prefs[Keys.exitOnUnplug] ?: false,
         allowAutoSleep = prefs[Keys.allowAutoSleep] ?: false,
         settingsOpenedOnce = prefs[Keys.settingsOpenedOnce] ?: false,
@@ -126,6 +130,7 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.dateFormat] = next.dateFormat.name
             prefs[Keys.monthFormat] = next.monthFormat.name
             prefs[Keys.weekdayFormat] = next.weekdayFormat.name
+            prefs[Keys.clockTheme] = next.clockTheme.name
             prefs[Keys.exitOnUnplug] = next.exitOnUnplug
             prefs[Keys.allowAutoSleep] = next.allowAutoSleep
             prefs[Keys.settingsOpenedOnce] = next.settingsOpenedOnce
@@ -146,6 +151,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setDateFormat(v: DateFormatOption) = update { it.copy(dateFormat = v) }
     suspend fun setMonthFormat(v: MonthFormatOption) = update { it.copy(monthFormat = v) }
     suspend fun setWeekdayFormat(v: WeekdayFormatOption) = update { it.copy(weekdayFormat = v) }
+    suspend fun setClockTheme(v: ClockTheme) = update { it.copy(clockTheme = v) }
     suspend fun setExitOnUnplug(v: Boolean) = update { it.copy(exitOnUnplug = v) }
     suspend fun setAllowAutoSleep(v: Boolean) = update { it.copy(allowAutoSleep = v) }
     suspend fun markSettingsOpenedOnce() = update { it.copy(settingsOpenedOnce = true) }

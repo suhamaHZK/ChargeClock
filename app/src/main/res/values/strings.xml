@@ -9,6 +9,10 @@
     <string name="language_en">English</string>
     <string name="language_ja">日本語</string>
     <string name="idle_brightness">Idle brightness</string>
+    <string name="clock_theme">Clock theme</string>
+    <string name="clock_theme_default">Default</string>
+    <string name="clock_theme_classic_digital">Classic Digital</string>
+    <string name="clock_theme_seg14_digital">14SEG Digital</string>
     <string name="text_color">Text color</string>
     <string name="discord_webhook">Discord webhook URL</string>
     <string name="discord_test_send">Send test Discord message</string>
@@ -64,4 +68,5 @@
     <string name="widget_description_full">Charge Clock - date, time, and battery</string>
     <string name="credits_oss">Credits / Open source</string>
     <string name="credits_holocolorpicker">HoloColorPicker - Lars Werkman - Apache License 2.0 - https://github.com/LarsWerkman/HoloColorPicker</string>
+    <string name="credits_dseg">DSEG - keshikan - SIL Open Font License 1.1 - https://github.com/keshikan/DSEG</string>
 </resources>

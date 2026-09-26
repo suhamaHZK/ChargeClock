@@ -18,7 +18,7 @@ class ChargeClockApp : Application() {
     override fun onCreate() {
         super.onCreate()
         settingsRepository = SettingsRepository(this)
-        // Dynamic TIME_TICK while process alive; AlarmManager covers process-dead case.
+        // TIME_TICK + Handler minute-arm while process alive; AlarmManager covers process-dead.
         WidgetTimeTickRegistrar.register(this)
     }
 }

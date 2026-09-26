@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -35,24 +36,44 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kmmm_engineering.chargeclock.R
+import com.kmmm_engineering.chargeclock.data.ClockTheme
 import com.kmmm_engineering.chargeclock.data.DisplayScale
 import com.kmmm_engineering.chargeclock.data.UserSettings
+import com.kmmm_engineering.chargeclock.ui.theme.ClockFonts
+import com.kmmm_engineering.chargeclock.ui.theme.ThemedClockText
 import com.kmmm_engineering.chargeclock.util.Formatters
 import com.kmmm_engineering.chargeclock.util.TimeParts
 import kotlinx.coroutines.delay
 import java.util.Calendar
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.random.Random
+
+/** Outer padding around the clock column (matches Column padding below). */
+private val ClockContentPadding = 24.dp
+
+/**
+ * Extra guard so OLED pixel-shift (±12px) does not clip after fit.
+ * Combined with [ClockContentPadding] when computing available space.
+ */
+private val OledShiftGuard = 16.dp
 
 @Composable
 fun ClockScreen(
@@ -74,10 +95,14 @@ fun ClockScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
+    // Align updates to the next second (or minute when seconds are hidden).
     LaunchedEffect(settings.showSeconds) {
         while (true) {
             now = System.currentTimeMillis()
-            delay(if (settings.showSeconds) 200L else 1000L)
+            val period = if (settings.showSeconds) 1_000L else 60_000L
+            val rem = now % period
+            val wait = if (rem == 0L) period else period - rem
+            delay(wait.coerceAtLeast(1L))
         }
     }
 
@@ -116,7 +141,10 @@ fun ClockScreen(
     val dateText = Formatters.formatDate(cal, settings)
     val timeParts = Formatters.formatTimeParts(cal, settings)
     val textColor = Color(settings.textColorArgb)
-    val scale = settings.displayScale.factor
+    val userScale = settings.displayScale.factor
+    val percentLabel = stringResource(R.string.battery_percent, batteryPercent)
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
 
     Box(
         modifier = modifier
@@ -148,35 +176,75 @@ fun ClockScreen(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Column(
-            modifier = Modifier
-                .offset { IntOffset(shiftX, shiftY) }
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = dateText,
-                color = textColor,
-                fontSize = (22 * scale).sp,
-                fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                softWrap = false,
-            )
-            Spacer(Modifier.height(8.dp))
-            ClockTimeBlock(
-                parts = timeParts,
-                settings = settings,
-                isLandscape = isLandscape,
-                textColor = textColor,
-            )
-            Spacer(Modifier.height(12.dp))
-            BatteryStatusBlock(
-                percent = batteryPercent,
-                isCharging = isCharging,
-                textColor = textColor,
-                scale = scale,
-            )
+            val fitScale = remember(
+                settings.displayScale,
+                settings.clockTheme,
+                settings.use24Hour,
+                settings.showSeconds,
+                dateText,
+                timeParts,
+                isCharging,
+                isLandscape,
+                percentLabel,
+                maxWidth,
+                maxHeight,
+                textMeasurer,
+                density,
+            ) {
+                computeClockFitScale(
+                    textMeasurer = textMeasurer,
+                    density = density,
+                    settings = settings,
+                    dateText = dateText,
+                    parts = timeParts,
+                    isCharging = isCharging,
+                    isLandscape = isLandscape,
+                    userScale = userScale,
+                    percentLabel = percentLabel,
+                    maxWidth = maxWidth,
+                    maxHeight = maxHeight,
+                )
+            }
+            val scale = userScale * fitScale
+
+            Column(
+                modifier = Modifier
+                    .offset { IntOffset(shiftX, shiftY) }
+                    .padding(ClockContentPadding),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                ThemedClockText(
+                    text = dateText,
+                    theme = settings.clockTheme,
+                    color = textColor,
+                    fontSize = (22 * scale).sp,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+                Spacer(Modifier.height(8.dp))
+                ClockTimeBlock(
+                    parts = timeParts,
+                    settings = settings,
+                    isLandscape = isLandscape,
+                    textColor = textColor,
+                    scale = scale,
+                )
+                Spacer(Modifier.height(12.dp))
+                BatteryStatusBlock(
+                    percent = batteryPercent,
+                    isCharging = isCharging,
+                    textColor = textColor,
+                    scale = scale,
+                    theme = settings.clockTheme,
+                    percentLabel = percentLabel,
+                )
+            }
         }
 
         val showPersistentHint = !settings.settingsOpenedOnce && !showSlider
@@ -209,19 +277,58 @@ fun ClockScreen(
 }
 
 /**
- * Portrait Large/XL + seconds → seconds on their own line.
- * Portrait Large/XL + 12h, or Normal+ with 12h+seconds → AM/PM separated (own line).
- * Landscape stays compact (Row) with mild font shrink so digits do not wrap/overlap.
+ * Fit factor ≤ 1 so the clock column (date + time + battery) fits in available space.
+ * Uses min(widthFit, heightFit); portrait typically binds on width, landscape on height.
  */
-@Composable
-private fun ClockTimeBlock(
-    parts: TimeParts,
+private fun computeClockFitScale(
+    textMeasurer: TextMeasurer,
+    density: Density,
     settings: UserSettings,
+    dateText: String,
+    parts: TimeParts,
+    isCharging: Boolean,
     isLandscape: Boolean,
-    textColor: Color,
-) {
+    userScale: Float,
+    percentLabel: String,
+    maxWidth: Dp,
+    maxHeight: Dp,
+): Float = with(density) {
+    val availW = (maxWidth - ClockContentPadding * 2 - OledShiftGuard)
+        .toPx()
+        .coerceAtLeast(1f)
+    val availH = (maxHeight - ClockContentPadding * 2 - OledShiftGuard)
+        .toPx()
+        .coerceAtLeast(1f)
+    val (contentW, contentH) = estimateClockContentPx(
+        textMeasurer = textMeasurer,
+        density = this,
+        settings = settings,
+        dateText = dateText,
+        parts = parts,
+        isCharging = isCharging,
+        isLandscape = isLandscape,
+        scale = userScale,
+        percentLabel = percentLabel,
+    )
+    min(1f, min(availW / contentW.coerceAtLeast(1f), availH / contentH.coerceAtLeast(1f)))
+}
+
+/**
+ * Intrinsic width/height of the clock column at [scale] (before fit), matching layout spacers.
+ */
+private fun estimateClockContentPx(
+    textMeasurer: TextMeasurer,
+    density: Density,
+    settings: UserSettings,
+    dateText: String,
+    parts: TimeParts,
+    isCharging: Boolean,
+    isLandscape: Boolean,
+    scale: Float,
+    percentLabel: String,
+): Pair<Float, Float> = with(density) {
+    val theme = settings.clockTheme
     val displayScale = settings.displayScale
-    val baseScale = displayScale.factor
     val isLargePlus = displayScale == DisplayScale.LARGE || displayScale == DisplayScale.XLARGE
     val isNormalPlus = displayScale != DisplayScale.SMALL
     val is12h = !settings.use24Hour
@@ -232,15 +339,242 @@ private fun ClockTimeBlock(
         isLargePlus || (isNormalPlus && showSeconds)
     )
 
-    // Mild shrink when packing 12h (+seconds) so landscape/compact rows stay readable.
-    val timeScale = when {
-        is12h && showSeconds && isLandscape -> baseScale * 0.82f
-        is12h && showSeconds -> baseScale * 0.90f
-        is12h && isLargePlus && isLandscape -> baseScale * 0.88f
-        is12h && isLargePlus -> baseScale * 0.92f
-        showSeconds && isLandscape && isLargePlus -> baseScale * 0.90f
-        else -> baseScale
+    val timeScale = clockTimeScale(
+        baseScale = scale,
+        is12h = is12h,
+        showSeconds = showSeconds,
+        isLandscape = isLandscape,
+        isLargePlus = isLargePlus,
+    )
+
+    // Date: CLASSIC uses Dseg14 (letters); SEG14 uses Dseg14; DEFAULT system.
+    val dateSize = measureClockText(
+        textMeasurer = textMeasurer,
+        text = dateText,
+        theme = theme,
+        fontSize = (22 * scale).sp,
+        fontWeight = FontWeight.Medium,
+        classicFamily = ClockFonts.Dseg14,
+    )
+
+    val mainSize = (64 * timeScale).sp
+    val secondsSize = if (secondsOnOwnLine) (40 * timeScale).sp else mainSize
+    val amPmSize = (22 * timeScale).sp
+
+    val hmSize = measureClockText(
+        textMeasurer = textMeasurer,
+        text = parts.hourMinute,
+        theme = theme,
+        fontSize = mainSize,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 1.sp,
+        classicFamily = ClockFonts.Dseg7,
+    )
+
+    val colonSecondsSize = if (!secondsOnOwnLine && parts.seconds != null) {
+        measureClockText(
+            textMeasurer = textMeasurer,
+            text = ":${parts.seconds}",
+            theme = theme,
+            fontSize = secondsSize,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp,
+            classicFamily = ClockFonts.Dseg7,
+        )
+    } else {
+        null
     }
+
+    val inlineAmPmSize = if (!amPmOnOwnLine && parts.amPm != null) {
+        measureClockText(
+            textMeasurer = textMeasurer,
+            text = parts.amPm,
+            theme = theme,
+            fontSize = amPmSize,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.sp,
+            classicFamily = ClockFonts.Dseg14,
+        )
+    } else {
+        null
+    }
+
+    val ownAmPmSize = if (amPmOnOwnLine && parts.amPm != null) {
+        measureClockText(
+            textMeasurer = textMeasurer,
+            text = parts.amPm,
+            theme = theme,
+            fontSize = amPmSize,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.sp,
+            classicFamily = ClockFonts.Dseg14,
+        )
+    } else {
+        null
+    }
+
+    val ownSecondsSize = if (secondsOnOwnLine && parts.seconds != null) {
+        measureClockText(
+            textMeasurer = textMeasurer,
+            text = parts.seconds,
+            theme = theme,
+            fontSize = secondsSize,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp,
+            classicFamily = ClockFonts.Dseg7,
+        )
+    } else {
+        null
+    }
+
+    var digitsRowW = hmSize.width.toFloat()
+    var digitsRowH = hmSize.height.toFloat()
+    if (colonSecondsSize != null) {
+        digitsRowW += colonSecondsSize.width
+        digitsRowH = max(digitsRowH, colonSecondsSize.height.toFloat())
+    }
+    if (inlineAmPmSize != null) {
+        digitsRowW += 10.dp.toPx() + inlineAmPmSize.width
+        digitsRowH = max(digitsRowH, inlineAmPmSize.height.toFloat())
+    }
+
+    var timeW = digitsRowW
+    var timeH = digitsRowH
+    if (ownAmPmSize != null) {
+        timeW = max(timeW, ownAmPmSize.width.toFloat())
+        timeH += ownAmPmSize.height + 2.dp.toPx()
+    }
+    if (ownSecondsSize != null) {
+        timeW = max(timeW, ownSecondsSize.width.toFloat())
+        timeH += 2.dp.toPx() + ownSecondsSize.height
+    }
+
+    // Battery percent (+ optional bolt) and 10 blocks.
+    val pctSize = measureClockText(
+        textMeasurer = textMeasurer,
+        text = percentLabel,
+        theme = theme,
+        fontSize = (36 * scale).sp,
+        fontWeight = FontWeight.SemiBold,
+        // Mixed digits + '%': classicAnnotated via null override.
+        classicFamily = null,
+    )
+    val boltW = if (isCharging) (22 * scale).dp.toPx() + (6 * scale).dp.toPx() else 0f
+    val boltH = if (isCharging) (22 * scale).dp.toPx() else 0f
+    val pctRowW = boltW + pctSize.width
+    val pctRowH = max(pctSize.height.toFloat(), boltH)
+    val blocksW = (10 * (16 * scale) + 9 * (5 * scale)).dp.toPx()
+    val blocksH = (28 * scale).dp.toPx()
+    val batteryW = max(pctRowW, blocksW)
+    val batteryH = pctRowH + (10 * scale).dp.toPx() + blocksH
+
+    val contentW = maxOf(dateSize.width.toFloat(), timeW, batteryW)
+    val contentH = dateSize.height + 8.dp.toPx() + timeH + 12.dp.toPx() + batteryH
+    contentW to contentH
+}
+
+/** Mild shrink multipliers for packing 12h / landscape — mirrors [ClockTimeBlock]. */
+private fun clockTimeScale(
+    baseScale: Float,
+    is12h: Boolean,
+    showSeconds: Boolean,
+    isLandscape: Boolean,
+    isLargePlus: Boolean,
+): Float = when {
+    is12h && showSeconds && isLandscape -> baseScale * 0.82f
+    is12h && showSeconds -> baseScale * 0.90f
+    is12h && isLargePlus && isLandscape -> baseScale * 0.88f
+    is12h && isLargePlus -> baseScale * 0.92f
+    showSeconds && isLandscape && isLargePlus -> baseScale * 0.90f
+    else -> baseScale
+}
+
+/**
+ * Measure with the same font families [ThemedClockText] uses.
+ * For CLASSIC_DIGITAL, [classicFamily] selects Dseg7 (digits/:) or Dseg14 (letters);
+ * null uses [ClockFonts.classicAnnotated] for mixed strings (e.g. battery %).
+ */
+private fun measureClockText(
+    textMeasurer: TextMeasurer,
+    text: String,
+    theme: ClockTheme,
+    fontSize: TextUnit,
+    fontWeight: FontWeight? = null,
+    letterSpacing: TextUnit = TextUnit.Unspecified,
+    classicFamily: FontFamily? = null,
+): androidx.compose.ui.unit.IntSize {
+    val base = TextStyle(
+        fontSize = fontSize,
+        letterSpacing = letterSpacing,
+    )
+    return when (theme) {
+        ClockTheme.DEFAULT -> textMeasurer.measure(
+            text = text,
+            style = base.copy(fontWeight = fontWeight),
+            softWrap = false,
+            maxLines = 1,
+        ).size
+        ClockTheme.SEG14_DIGITAL -> textMeasurer.measure(
+            text = text,
+            style = base.copy(fontFamily = ClockFonts.Dseg14),
+            softWrap = false,
+            maxLines = 1,
+        ).size
+        ClockTheme.CLASSIC_DIGITAL -> {
+            if (classicFamily != null) {
+                textMeasurer.measure(
+                    text = text,
+                    style = base.copy(fontFamily = classicFamily),
+                    softWrap = false,
+                    maxLines = 1,
+                ).size
+            } else {
+                textMeasurer.measure(
+                    text = ClockFonts.classicAnnotated(text),
+                    style = base,
+                    softWrap = false,
+                    maxLines = 1,
+                ).size
+            }
+        }
+    }
+}
+
+/**
+ * Portrait Large/XL + seconds → seconds on their own line.
+ * Portrait Large/XL + 12h, or Normal+ with 12h+seconds → AM/PM separated (own line).
+ * Landscape stays compact (Row) with mild font shrink so digits do not wrap/overlap.
+ *
+ * [scale] is the already-fitted visual scale (user DisplayScale.factor × fit ≤ 1).
+ * Line-break rules still key off [UserSettings.displayScale] enum, not the float.
+ */
+@Composable
+private fun ClockTimeBlock(
+    parts: TimeParts,
+    settings: UserSettings,
+    isLandscape: Boolean,
+    textColor: Color,
+    scale: Float,
+) {
+    val displayScale = settings.displayScale
+    val baseScale = scale
+    val isLargePlus = displayScale == DisplayScale.LARGE || displayScale == DisplayScale.XLARGE
+    val isNormalPlus = displayScale != DisplayScale.SMALL
+    val is12h = !settings.use24Hour
+    val showSeconds = parts.seconds != null
+
+    val secondsOnOwnLine = !isLandscape && showSeconds && isLargePlus
+    val amPmOnOwnLine = is12h && !isLandscape && (
+        isLargePlus || (isNormalPlus && showSeconds)
+    )
+
+    val timeScale = clockTimeScale(
+        baseScale = baseScale,
+        is12h = is12h,
+        showSeconds = showSeconds,
+        isLandscape = isLandscape,
+        isLargePlus = isLargePlus,
+    )
 
     val mainSize = (64 * timeScale).sp
     val secondsSize = if (secondsOnOwnLine) (40 * timeScale).sp else mainSize
@@ -249,8 +583,9 @@ private fun ClockTimeBlock(
     if (amPmOnOwnLine || secondsOnOwnLine) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             if (amPmOnOwnLine && parts.amPm != null) {
-                Text(
+                ThemedClockText(
                     text = parts.amPm,
+                    theme = settings.clockTheme,
                     color = textColor,
                     fontSize = amPmSize,
                     fontWeight = FontWeight.SemiBold,
@@ -269,11 +604,13 @@ private fun ClockTimeBlock(
                 secondsSize = secondsSize,
                 amPmSize = amPmSize,
                 textColor = textColor,
+                theme = settings.clockTheme,
             )
             if (secondsOnOwnLine && parts.seconds != null) {
                 Spacer(Modifier.height(2.dp))
-                Text(
+                ThemedClockText(
                     text = parts.seconds,
+                    theme = settings.clockTheme,
                     color = textColor,
                     fontSize = secondsSize,
                     fontWeight = FontWeight.Bold,
@@ -294,6 +631,7 @@ private fun ClockTimeBlock(
             secondsSize = mainSize,
             amPmSize = amPmSize,
             textColor = textColor,
+            theme = settings.clockTheme,
         )
     }
 }
@@ -307,13 +645,15 @@ private fun TimeDigitsRow(
     secondsSize: TextUnit,
     amPmSize: TextUnit,
     textColor: Color,
+    theme: ClockTheme,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
-        Text(
+        ThemedClockText(
             text = hourMinute,
+            theme = theme,
             color = textColor,
             fontSize = mainSize,
             fontWeight = FontWeight.Bold,
@@ -323,8 +663,9 @@ private fun TimeDigitsRow(
             letterSpacing = 1.sp,
         )
         if (seconds != null) {
-            Text(
+            ThemedClockText(
                 text = ":$seconds",
+                theme = theme,
                 color = textColor,
                 fontSize = secondsSize,
                 fontWeight = FontWeight.Bold,
@@ -336,8 +677,9 @@ private fun TimeDigitsRow(
         }
         if (amPm != null) {
             Spacer(Modifier.width(10.dp))
-            Text(
+            ThemedClockText(
                 text = amPm,
+                theme = theme,
                 color = textColor,
                 fontSize = amPmSize,
                 fontWeight = FontWeight.SemiBold,
@@ -363,8 +705,9 @@ private fun BatteryStatusBlock(
     isCharging: Boolean,
     textColor: Color,
     scale: Float,
+    theme: ClockTheme,
+    percentLabel: String,
 ) {
-    val percentLabel = stringResource(R.string.battery_percent, percent)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -379,8 +722,9 @@ private fun BatteryStatusBlock(
                 )
                 Spacer(Modifier.width((6 * scale).dp))
             }
-            Text(
+            ThemedClockText(
                 text = percentLabel,
+                theme = theme,
                 color = textColor,
                 fontSize = (36 * scale).sp,
                 fontWeight = FontWeight.SemiBold,

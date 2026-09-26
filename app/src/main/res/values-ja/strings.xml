@@ -9,6 +9,10 @@
     <string name="language_en">English</string>
     <string name="language_ja">日本語</string>
     <string name="idle_brightness">待機時の輝度</string>
+    <string name="clock_theme">時計テーマ</string>
+    <string name="clock_theme_default">Default</string>
+    <string name="clock_theme_classic_digital">Classic Digital</string>
+    <string name="clock_theme_seg14_digital">14SEG Digital</string>
     <string name="text_color">文字色</string>
     <string name="discord_webhook">Discord Webhook URL</string>
     <string name="discord_test_send">Discordテスト送信</string>
@@ -64,4 +68,5 @@
     <string name="widget_description_full">充電時計 - 日付・時刻・バッテリー</string>
     <string name="credits_oss">クレジット / オープンソース</string>
     <string name="credits_holocolorpicker">HoloColorPicker — Lars Werkman — Apache License 2.0 — https://github.com/LarsWerkman/HoloColorPicker</string>
+    <string name="credits_dseg">DSEG — けしかん — SIL Open Font License 1.1 — https://github.com/keshikan/DSEG</string>
 </resources>

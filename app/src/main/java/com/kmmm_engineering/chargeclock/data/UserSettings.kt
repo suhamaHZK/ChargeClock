@@ -10,6 +10,8 @@ enum class MonthFormatOption { NUMERIC, ABBR }
 
 enum class WeekdayFormatOption { EN, JA, TW, CN }
 
+enum class ClockTheme { DEFAULT, CLASSIC_DIGITAL, SEG14_DIGITAL }
+
 /** Display scale multipliers for the clock block. */
 enum class DisplayScale(val factor: Float) {
     SMALL(0.85f),
@@ -26,6 +28,8 @@ enum class DisplayScale(val factor: Float) {
  *
  * [settingsOpenedOnce] is true after SettingsScreen has been shown at least once.
  * DataStore key remains first_run_hint_seen for migration from v1.0.0.
+ *
+ * [clockTheme] selects main-clock / widget digit fonts (default system).
  */
 data class UserSettings(
     val language: AppLanguage = AppLanguage.SYSTEM,
@@ -41,7 +45,21 @@ data class UserSettings(
     val dateFormat: DateFormatOption = DateFormatOption.YMD,
     val monthFormat: MonthFormatOption = MonthFormatOption.NUMERIC,
     val weekdayFormat: WeekdayFormatOption = WeekdayFormatOption.EN,
+    val clockTheme: ClockTheme = ClockTheme.DEFAULT,
     val exitOnUnplug: Boolean = false,
     val allowAutoSleep: Boolean = false,
     val settingsOpenedOnce: Boolean = false,
-)
+) {
+    /**
+     * Weekday language used for formatting. Digital themes force English so
+     * weekday glyphs fit DSEG; stored [weekdayFormat] is left unchanged.
+     */
+    val effectiveWeekdayFormat: WeekdayFormatOption
+        get() = when (clockTheme) {
+            ClockTheme.DEFAULT -> weekdayFormat
+            ClockTheme.CLASSIC_DIGITAL, ClockTheme.SEG14_DIGITAL -> WeekdayFormatOption.EN
+        }
+
+    val forcesEnglishWeekday: Boolean
+        get() = clockTheme != ClockTheme.DEFAULT
+}
