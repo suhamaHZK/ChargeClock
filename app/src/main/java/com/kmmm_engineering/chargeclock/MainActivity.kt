@@ -189,7 +189,8 @@ class MainActivity : AppCompatActivity() {
             }
 
             // Discord thresholds — shared helper with widget path (DataStore latch).
-            // restoreKeepingSeed: cross since last persisted sample can fire.
+            // First sample in this process only seeds (a cross while dead must not fire).
+            // Later in-process samples can fire on a real cross since the last sample.
             LaunchedEffect(
                 batteryState.value,
                 settingsState.value,

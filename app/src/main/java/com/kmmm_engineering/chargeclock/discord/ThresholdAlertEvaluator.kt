@@ -8,11 +8,20 @@ import com.kmmm_engineering.chargeclock.data.UserSettings
 /**
  * Shared Discord threshold-cross evaluation for MainActivity and widget updates.
  *
- * Uses [ThresholdFireTracker.restoreKeepingSeed] so a cross between the persisted last
- * sample and the current sample can fire (background / widget polling). Persists the
- * latch after every check; empty webhook or OFF thresholds (-1) never send.
+ * The first [evaluateAndNotify] in this process uses [ThresholdFireTracker.restore]
+ * so [ThresholdFireTracker.check] only seeds from the live battery and returns null
+ * (a cross while the process was dead must not notify). Later calls in the same
+ * process use [ThresholdFireTracker.restoreKeepingSeed] so a real cross since the
+ * last in-process sample can fire. Charge and discharge share that gate.
+ *
+ * The process-first flag is not reset when settings change; threshold re-arm stays
+ * inside [ThresholdFireTracker.check]. Load + check + save run under one mutex so
+ * two concurrent first calls (activity + widget) cannot both cross against a stale
+ * snapshot. Empty webhook or OFF thresholds (-1) never send.
  */
 object ThresholdAlertEvaluator {
+
+    private val session = ProcessThresholdSession()
 
     /**
      * @param settings optional snapshot to avoid a second DataStore read when the caller
@@ -29,15 +38,23 @@ object ThresholdAlertEvaluator {
         val repo = app.settingsRepository
         val s = settings ?: repo.getSettingsOnce()
 
-        val tracker = ThresholdFireTracker()
-        tracker.restoreKeepingSeed(repo.loadThresholdAlertSnapshot())
-        val kind = tracker.check(
-            percent = percent,
-            isCharging = isCharging,
-            dischargeThreshold = s.discordDischargeThreshold,
-            chargeThreshold = s.discordChargeThreshold,
-        )
-        repo.saveThresholdAlertSnapshot(tracker.snapshot())
+        val kind = session.withProcessRestore { firstInProcess ->
+            val tracker = ThresholdFireTracker()
+            val snapshot = repo.loadThresholdAlertSnapshot()
+            if (firstInProcess) {
+                tracker.restore(snapshot)
+            } else {
+                tracker.restoreKeepingSeed(snapshot)
+            }
+            val fired = tracker.check(
+                percent = percent,
+                isCharging = isCharging,
+                dischargeThreshold = s.discordDischargeThreshold,
+                chargeThreshold = s.discordChargeThreshold,
+            )
+            repo.saveThresholdAlertSnapshot(tracker.snapshot())
+            fired
+        }
 
         if (kind == null || s.discordWebhookUrl.isBlank()) return
 

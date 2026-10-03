@@ -15,13 +15,15 @@ import kotlinx.coroutines.launch
  * 1. Dynamic [Intent.ACTION_TIME_TICK] (cannot be declared in the manifest).
  * 2. A [Handler] armed to the next minute boundary so we still hit :00 when
  *    AlarmManager is late on some OEMs (observed ~20–35s delay on setAlarmClock).
+ * 3. [Intent.ACTION_SCREEN_ON] refreshes immediately; [Intent.ACTION_SCREEN_OFF]
+ *    drops the non-idle setExact and keeps the Doze-safe survival alarm.
+ *    Neither can be manifest-registered, so they only run while this process lives.
  *
- * Both paths invoke [ClockWidgetUpdater.updateAll] off the main thread — DataStore
+ * Update paths call [ClockWidgetUpdater.updateAll] off the main thread — DataStore
  * is read via runBlocking inside updateAll and must not block main.
  *
- * When the process dies, Handler / TIME_TICK die with it; [WidgetAlarmScheduler]
- * (interactive [android.app.AlarmManager.setExact]) must still be correct for the
- * cold-start case.
+ * When the process dies, Handler / TIME_TICK / screen callbacks die with it.
+ * [WidgetAlarmScheduler] setAlarmClock is what still fires.
  */
 object WidgetTimeTickRegistrar {
     private const val TAG = "WidgetTimeTick"
@@ -50,6 +52,22 @@ object WidgetTimeTickRegistrar {
         }
     }
 
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent?) {
+            val appCtx = context.applicationContext
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_ON -> {
+                    scheduleUpdateOffMain(appCtx)
+                    armMinuteHandler(appCtx)
+                }
+                Intent.ACTION_SCREEN_OFF -> {
+                    // setExact would be deferred for the whole Doze window.
+                    WidgetAlarmScheduler.scheduleNextIfPlaced(appCtx, forceSurvivalOnly = true)
+                }
+            }
+        }
+    }
+
     fun register(context: Context) {
         val appCtx = context.applicationContext
         synchronized(this) {
@@ -62,6 +80,20 @@ object WidgetTimeTickRegistrar {
                     IntentFilter(Intent.ACTION_TIME_TICK),
                     ContextCompat.RECEIVER_NOT_EXPORTED,
                 )
+                try {
+                    val screenFilter = IntentFilter().apply {
+                        addAction(Intent.ACTION_SCREEN_ON)
+                        addAction(Intent.ACTION_SCREEN_OFF)
+                    }
+                    ContextCompat.registerReceiver(
+                        appCtx,
+                        screenReceiver,
+                        screenFilter,
+                        ContextCompat.RECEIVER_NOT_EXPORTED,
+                    )
+                } catch (e: Exception) {
+                    Log.w(TAG, "SCREEN_ON/OFF register failed", e)
+                }
                 registered = true
             }
         }

@@ -12,6 +12,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.os.BatteryManager
 import android.os.Bundle
+import android.util.Log
 import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
@@ -47,19 +48,21 @@ import java.util.Calendar
  *
  * Update cadence (minSdk 29) — date / battery / Discord / digital time:
  * - android:updatePeriodMillis is floored to ~30 minutes by the system — safety net only.
- * - Primary (cold process): [WidgetAlarmScheduler] — interactive screen →
- *   AlarmManager.setExact at each minute boundary; screen off → setAlarmClock
- *   (Doze-safe) with while-idle fallbacks. Some OEMs delay minute setAlarmClock
- *   (~20–35s); interactive setExact is the on-time path for DSEG. Also refreshes
- *   on TIME_CHANGED / TIMEZONE_CHANGED / BOOT_COMPLETED and settings via [updateAll].
+ * - Primary (cold process): [WidgetAlarmScheduler] setAlarmClock at each minute
+ *   boundary (Doze-safe, re-armed every tick). While the screen is on and exact
+ *   alarms are allowed, setExact is added for on-time DSEG flips. Some OEMs delay
+ *   minute setAlarmClock (~20–35s). Also refreshes on TIME_SET / TIMEZONE_CHANGED /
+ *   DATE_CHANGED / BOOT_COMPLETED / MY_PACKAGE_REPLACED.
  * - While the process is alive, [WidgetTimeTickRegistrar] listens for
- *   ACTION_TIME_TICK and arms a Handler to the next minute boundary (precision
- *   backup when AlarmManager is late). Both run updateAll off-main.
+ *   ACTION_TIME_TICK, SCREEN_ON/OFF, and arms a Handler to the next minute
+ *   boundary (precision backup when AlarmManager is late). Both run updateAll off-main.
  * - After each [updateAll], Discord battery thresholds are evaluated via
  *   [com.kmmm_engineering.chargeclock.discord.ThresholdAlertEvaluator].
  * Widgets never show seconds; text size scales to widget bounds (ignores displayScale).
  */
 object ClockWidgetUpdater {
+
+    private const val TAG = "ClockWidgetUpdater"
 
     enum class Kind { COMPACT, FULL }
 
@@ -76,19 +79,30 @@ object ClockWidgetUpdater {
         val fullIds = mgr.getAppWidgetIds(
             ComponentName(appCtx, ClockWidgetFullProvider::class.java),
         )
-        val settings = loadSettings(appCtx)
-        val battery = readBattery(appCtx)
-        if (compactIds.isNotEmpty() || fullIds.isNotEmpty()) {
-            compactIds.forEach { id ->
-                updateOne(appCtx, mgr, id, Kind.COMPACT, settings, battery.percent, battery.charging)
+        val hasWidgets = compactIds.isNotEmpty() || fullIds.isNotEmpty()
+        try {
+            val settings = loadSettings(appCtx)
+            val battery = readBattery(appCtx)
+            if (hasWidgets) {
+                compactIds.forEach { id ->
+                    updateOne(appCtx, mgr, id, Kind.COMPACT, settings, battery.percent, battery.charging)
+                }
+                fullIds.forEach { id ->
+                    updateOne(appCtx, mgr, id, Kind.FULL, settings, battery.percent, battery.charging)
+                }
             }
-            fullIds.forEach { id ->
-                updateOne(appCtx, mgr, id, Kind.FULL, settings, battery.percent, battery.charging)
+            // Evaluate Discord thresholds even with no widgets (settings / TIME_TICK / alarm).
+            maybeEvaluateDiscordThresholds(appCtx, battery.percent, battery.charging, settings)
+        } finally {
+            // Drawing or DataStore must not drop the one-shot alarm chain.
+            if (hasWidgets) {
+                try {
+                    WidgetAlarmScheduler.scheduleNext(appCtx)
+                } catch (e: Exception) {
+                    Log.e(TAG, "reschedule after updateAll failed", e)
+                }
             }
-            WidgetAlarmScheduler.scheduleNext(appCtx)
         }
-        // Evaluate Discord thresholds even with no widgets (settings / TIME_TICK / alarm).
-        maybeEvaluateDiscordThresholds(appCtx, battery.percent, battery.charging, settings)
     }
 
     /**
@@ -132,12 +146,19 @@ object ClockWidgetUpdater {
     ) {
         if (appWidgetIds.isEmpty()) return
         val appCtx = context.applicationContext
-        val settings = loadSettings(appCtx)
-        val battery = readBattery(appCtx)
-        appWidgetIds.forEach { id ->
-            updateOne(appCtx, appWidgetManager, id, kind, settings, battery.percent, battery.charging)
+        try {
+            val settings = loadSettings(appCtx)
+            val battery = readBattery(appCtx)
+            appWidgetIds.forEach { id ->
+                updateOne(appCtx, appWidgetManager, id, kind, settings, battery.percent, battery.charging)
+            }
+        } finally {
+            try {
+                WidgetAlarmScheduler.scheduleNext(appCtx)
+            } catch (e: Exception) {
+                Log.e(TAG, "reschedule after updateIds failed", e)
+            }
         }
-        WidgetAlarmScheduler.scheduleNext(appCtx)
     }
 
     private fun loadSettings(context: Context): UserSettings {

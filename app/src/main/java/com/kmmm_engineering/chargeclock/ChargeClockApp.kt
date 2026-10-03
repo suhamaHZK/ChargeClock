@@ -2,6 +2,7 @@ package com.kmmm_engineering.chargeclock
 
 import android.app.Application
 import com.kmmm_engineering.chargeclock.data.SettingsRepository
+import com.kmmm_engineering.chargeclock.widget.WidgetAlarmScheduler
 import com.kmmm_engineering.chargeclock.widget.WidgetTimeTickRegistrar
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,5 +21,7 @@ class ChargeClockApp : Application() {
         settingsRepository = SettingsRepository(this)
         // TIME_TICK + Handler minute-arm while process alive; AlarmManager covers process-dead.
         WidgetTimeTickRegistrar.register(this)
+        // Re-arm if the previous one-shot was lost (process death, update, Doze drop).
+        WidgetAlarmScheduler.scheduleNextIfPlaced(this)
     }
 }

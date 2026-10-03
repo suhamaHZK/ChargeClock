@@ -7,7 +7,7 @@ import android.provider.MediaStore
 import com.kmmm_engineering.chargeclock.R
 
 /**
- * Saves the bundled Discord webhook PNG into DCIM via MediaStore.
+ * Saves the bundled Discord webhook PNG into DCIM/KMMM-Engineering via MediaStore.
  * minSdk 29: RELATIVE_PATH + IS_PENDING (no legacy storage permission).
  */
 object DiscordIconSaver {
@@ -19,7 +19,7 @@ object DiscordIconSaver {
                 put(MediaStore.Images.Media.MIME_TYPE, "image/png")
                 put(
                     MediaStore.Images.Media.RELATIVE_PATH,
-                    Environment.DIRECTORY_DCIM + "/ChargeClock",
+                    Environment.DIRECTORY_DCIM + "/KMMM-Engineering",
                 )
                 put(MediaStore.Images.Media.IS_PENDING, 1)
             }

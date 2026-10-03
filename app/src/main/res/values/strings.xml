@@ -56,7 +56,7 @@
     <string name="color_picker_ok">OK</string>
     <string name="color_picker_cancel">Cancel</string>
     <string name="discord_icon_get">Get webhook icon</string>
-    <string name="discord_icon_save_ok">Icon saved to DCIM</string>
+    <string name="discord_icon_save_ok">Icon saved to Photos</string>
     <string name="discord_icon_save_fail">Failed to save icon</string>
     <string name="widget_section">Home screen widget</string>
     <string name="widget_pin">Add widget</string>
