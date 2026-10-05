@@ -303,6 +303,14 @@ fun SettingsScreen(
                 checked = settings.showSeconds,
                 onCheckedChange = { scope.launch { repository.setShowSeconds(it) } },
             )
+            if (settings.showSeconds) {
+                SwitchRow(
+                    label = stringResource(R.string.hide_seconds_when_idle),
+                    description = stringResource(R.string.hide_seconds_when_idle_desc),
+                    checked = settings.hideSecondsWhenIdle,
+                    onCheckedChange = { scope.launch { repository.setHideSecondsWhenIdle(it) } },
+                )
+            }
 
             SectionTitle(stringResource(R.string.date_format))
             SimpleDropdown(
@@ -369,6 +377,19 @@ fun SettingsScreen(
                 checked = settings.allowAutoSleep,
                 onCheckedChange = { scope.launch { repository.setAllowAutoSleep(it) } },
             )
+
+            SwitchRow(
+                label = stringResource(R.string.blank_when_idle_discharging),
+                description = stringResource(R.string.blank_when_idle_discharging_desc),
+                checked = settings.blankWhenIdleDischarging,
+                onCheckedChange = { scope.launch { repository.setBlankWhenIdleDischarging(it) } },
+            )
+            if (settings.blankWhenIdleDischarging) {
+                SectionTitle(stringResource(R.string.blank_idle_delay))
+                BlankDelayDropdown(settings.blankIdleDelaySec) { v ->
+                    scope.launch { repository.setBlankIdleDelaySec(v) }
+                }
+            }
 
             SectionTitle(stringResource(R.string.widget_section))
             Button(
@@ -766,7 +787,12 @@ private fun <T> SimpleDropdown(
 }
 
 @Composable
-private fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun SwitchRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    description: String? = null,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -774,9 +800,36 @@ private fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(label, color = Color.White, modifier = Modifier.weight(1f))
+        if (description == null) {
+            Text(label, color = Color.White, modifier = Modifier.weight(1f))
+        } else {
+            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                Text(label, color = Color.White)
+                Text(
+                    text = description,
+                    color = Color(0xFFAAAAAA),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
+}
+
+/** Blank-screen delay: Immediately / 1 / 2 / 3 / 5 / 10 min (stored as seconds). */
+@Composable
+private fun BlankDelayDropdown(currentSec: Int, onSelect: (Int) -> Unit) {
+    val immediately = stringResource(R.string.blank_delay_immediately)
+    val labels = IdleDisplayPolicy.BLANK_DELAY_OPTIONS_SEC.associateWith { sec ->
+        if (sec == 0) immediately else stringResource(R.string.blank_delay_minutes, sec / 60)
+    }
+    val labelOf: (Int) -> String = { sec -> labels[sec] ?: immediately }
+    SimpleDropdown(
+        options = IdleDisplayPolicy.BLANK_DELAY_OPTIONS_SEC.map { it to labelOf(it) },
+        selected = IdleDisplayPolicy.normalizeBlankDelaySec(currentSec),
+        labelOf = labelOf,
+        onSelect = onSelect,
+    )
 }
 
 

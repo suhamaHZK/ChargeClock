@@ -43,6 +43,13 @@
     <string name="weekday_cn">周一,周二,…</string>
     <string name="exit_on_unplug">Exit when charger unplugged</string>
     <string name="allow_auto_sleep">Allow auto-sleep while running</string>
+    <string name="hide_seconds_when_idle">Hide seconds while idle</string>
+    <string name="hide_seconds_when_idle_desc">Seconds are shown for 5 s after a tap, then hidden and the clock updates once a minute.</string>
+    <string name="blank_when_idle_discharging">Go black while idle on battery</string>
+    <string name="blank_when_idle_discharging_desc">For OLED screens. When not charging, the clock turns completely black after the selected time without interaction. Tap once to show it again.</string>
+    <string name="blank_idle_delay">Time until black</string>
+    <string name="blank_delay_immediately">Immediately</string>
+    <string name="blank_delay_minutes">%1$d min</string>
     <string name="on">On</string>
     <string name="off">Off</string>
     <string name="back">Back</string>

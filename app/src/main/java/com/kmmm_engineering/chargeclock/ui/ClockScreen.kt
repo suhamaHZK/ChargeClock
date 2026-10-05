@@ -3,6 +3,8 @@ package com.kmmm_engineering.chargeclock.ui
 import android.content.res.Configuration
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -83,9 +85,18 @@ fun ClockScreen(
     onSingleTap: () -> Unit,
     onOpenSettings: () -> Unit,
     onUnlockSliderVisibilityChange: (Boolean) -> Unit = {},
+    /** Past the 5 s tap-brighten (see [IdleDisplayPolicy]); may hide seconds. */
+    idle: Boolean = false,
+    /** Draw pure black (OLED power save); any touch only wakes via [onWakeFromBlank]. */
+    blank: Boolean = false,
+    onWakeFromBlank: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    // Last wake-from-black press; taps landing right after it (e.g. 2nd tap of a double-tap
+    // on the black screen) are swallowed so they do not open the slider / count as taps.
+    var wokeAt by remember { mutableLongStateOf(0L) }
+    var lastPressAt by remember { mutableLongStateOf(0L) }
     var showSlider by remember { mutableStateOf(false) }
     // Lost-user temporary hint: show double_tap_hint for 5s after >=5 taps in 60s.
     val recentTapAts = remember { ArrayDeque<Long>() }
@@ -95,19 +106,26 @@ fun ClockScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
+    val secondsVisible = IdleDisplayPolicy.showSecondsNow(
+        showSeconds = settings.showSeconds,
+        hideSecondsWhenIdle = settings.hideSecondsWhenIdle,
+        idle = idle,
+    )
+
     // Align updates to the next second (or minute when seconds are hidden).
-    LaunchedEffect(settings.showSeconds) {
+    // Stopped while black; restarting on wake refreshes `now` immediately.
+    LaunchedEffect(secondsVisible, blank) {
+        if (blank) return@LaunchedEffect
+        val period = IdleDisplayPolicy.tickPeriodMs(secondsVisible)
         while (true) {
             now = System.currentTimeMillis()
-            val period = if (settings.showSeconds) 1_000L else 60_000L
-            val rem = now % period
-            val wait = if (rem == 0L) period else period - rem
-            delay(wait.coerceAtLeast(1L))
+            delay(IdleDisplayPolicy.delayToNextTick(now, period).coerceAtLeast(1L))
         }
     }
 
-    // OLED pixel shift every ~3 minutes, a few to ~15 px
-    LaunchedEffect(Unit) {
+    // OLED pixel shift every ~3 minutes, a few to ~15 px (paused while black).
+    LaunchedEffect(blank) {
+        if (blank) return@LaunchedEffect
         while (true) {
             delay(3 * 60 * 1000L)
             shiftX = Random.nextInt(-12, 13)
@@ -135,11 +153,44 @@ fun ClockScreen(
         }
     }
 
+    if (blank) {
+        // Pure black. Any pointer down (single or double tap) only wakes the clock:
+        // no unlock slider, no brighten-tap, no 5-tap hint count.
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        down.consume()
+                        val t = System.currentTimeMillis()
+                        wokeAt = t
+                        now = t
+                        onWakeFromBlank()
+                        // Swallow the rest of this gesture.
+                        do {
+                            val event = awaitPointerEvent()
+                            event.changes.forEach { it.consume() }
+                        } while (event.changes.any { it.pressed })
+                    }
+                },
+        )
+        return
+    }
+
     val cal = remember(now) {
         Calendar.getInstance().apply { timeInMillis = now }
     }
     val dateText = Formatters.formatDate(cal, settings)
-    val timeParts = Formatters.formatTimeParts(cal, settings)
+    // Fit scale uses the configured seconds so the clock size does not jump when idle
+    // hides them; the drawn time uses the idle-aware seconds visibility.
+    val fitTimeParts = Formatters.formatTimeParts(cal, settings)
+    val timeParts = if (secondsVisible == settings.showSeconds) {
+        fitTimeParts
+    } else {
+        Formatters.formatTimeParts(cal, settings.copy(showSeconds = secondsVisible))
+    }
     val textColor = Color(settings.textColorArgb)
     val userScale = settings.displayScale.factor
     val percentLabel = stringResource(R.string.battery_percent, batteryPercent)
@@ -152,7 +203,15 @@ fun ClockScreen(
             .background(Color.Black)
             .pointerInput(Unit) {
                 detectTapGestures(
+                    onPress = {
+                        lastPressAt = System.currentTimeMillis()
+                    },
                     onTap = {
+                        if (IdleDisplayPolicy.classifyTap(blank = false, pressAt = lastPressAt, wokeAt = wokeAt) ==
+                            IdleDisplayPolicy.TapResult.WAKE_ONLY
+                        ) {
+                            return@detectTapGestures
+                        }
                         if (showSlider) {
                             showSlider = false
                         } else {
@@ -169,6 +228,11 @@ fun ClockScreen(
                         }
                     },
                     onDoubleTap = {
+                        if (IdleDisplayPolicy.classifyTap(blank = false, pressAt = lastPressAt, wokeAt = wokeAt) ==
+                            IdleDisplayPolicy.TapResult.WAKE_ONLY
+                        ) {
+                            return@detectTapGestures
+                        }
                         // Open unlock slider only; do not mark settings-opened.
                         showSlider = true
                     },
@@ -186,7 +250,7 @@ fun ClockScreen(
                 settings.use24Hour,
                 settings.showSeconds,
                 dateText,
-                timeParts,
+                fitTimeParts,
                 isCharging,
                 isLandscape,
                 percentLabel,
@@ -200,7 +264,7 @@ fun ClockScreen(
                     density = density,
                     settings = settings,
                     dateText = dateText,
-                    parts = timeParts,
+                    parts = fitTimeParts,
                     isCharging = isCharging,
                     isLandscape = isLandscape,
                     userScale = userScale,

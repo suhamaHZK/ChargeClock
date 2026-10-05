@@ -30,6 +30,9 @@ enum class DisplayScale(val factor: Float) {
  * DataStore key remains first_run_hint_seen for migration from v1.0.0.
  *
  * [clockTheme] selects main-clock / widget digit fonts (default system).
+ *
+ * [blankWhenIdleDischarging] / [blankIdleDelaySec] / [hideSecondsWhenIdle] are main-clock
+ * power-saving options (see ui.IdleDisplayPolicy); widgets ignore them.
  */
 data class UserSettings(
     val language: AppLanguage = AppLanguage.SYSTEM,
@@ -49,6 +52,12 @@ data class UserSettings(
     val exitOnUnplug: Boolean = false,
     val allowAutoSleep: Boolean = false,
     val settingsOpenedOnce: Boolean = false,
+    /** Main clock goes pure black after [blankIdleDelaySec] idle while discharging (OLED). */
+    val blankWhenIdleDischarging: Boolean = false,
+    /** Seconds since last interaction before blanking; 0 = right after the 5 s brighten. */
+    val blankIdleDelaySec: Int = 60,
+    /** Hide seconds (and tick per minute) once the 5 s tap-brighten has ended. */
+    val hideSecondsWhenIdle: Boolean = false,
 ) {
     /**
      * Weekday language used for formatting. Digital themes force English so

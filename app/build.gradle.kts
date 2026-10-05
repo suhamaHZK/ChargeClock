@@ -15,8 +15,8 @@ android {
         applicationId = "com.kmmm_engineering.chargeclock"
         minSdk = 29
         targetSdk = 36
-        versionCode = 106
-        versionName = "1.0.6"
+        versionCode = 107
+        versionName = "1.0.7"
 
         // APK sideload builds pass -PappRev=005; bundleRelease / Play AAB omit -PappRev so APP_REV is empty.
         val appRev = (findProperty("appRev") as String?)?.trim().orEmpty()

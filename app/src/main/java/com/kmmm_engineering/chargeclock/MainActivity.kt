@@ -31,6 +31,7 @@ import com.kmmm_engineering.chargeclock.data.LandscapeMode
 import com.kmmm_engineering.chargeclock.data.UserSettings
 import com.kmmm_engineering.chargeclock.discord.ThresholdAlertEvaluator
 import com.kmmm_engineering.chargeclock.ui.ClockScreen
+import com.kmmm_engineering.chargeclock.ui.IdleDisplayPolicy
 import com.kmmm_engineering.chargeclock.ui.SettingsScreen
 import com.kmmm_engineering.chargeclock.ui.theme.ChargeClockTheme
 import kotlinx.coroutines.delay
@@ -97,7 +98,11 @@ class MainActivity : AppCompatActivity() {
             DisposableEffect(lifecycleOwner) {
                 val observer = LifecycleEventObserver { _, event ->
                     when (event) {
-                        Lifecycle.Event.ON_RESUME -> activityResumed = true
+                        Lifecycle.Event.ON_RESUME -> {
+                            activityResumed = true
+                            // Come back showing the clock (not black / not seconds-hidden).
+                            lastInteractionAt = System.currentTimeMillis()
+                        }
                         Lifecycle.Event.ON_PAUSE -> activityResumed = false
                         else -> Unit
                     }
@@ -176,6 +181,56 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            // Main-clock idle state: seconds hiding + OLED blank (pure helper decides).
+            // Discharging = !isPlugged && !isCharging (BatteryMonitor reports isCharging
+            // whenever plugged, so this matches the Discord discharge side).
+            val batteryKnown = batteryState.value != null
+            val discharging = batteryKnown &&
+                IdleDisplayPolicy.isDischarging(battery.isCharging, battery.isPlugged)
+            // Plug-in / unplug restarts the blank countdown (plug-in also exits black at once
+            // because blank requires discharging). Initial value only seeds.
+            var previousDischarging by remember { mutableStateOf<Boolean?>(null) }
+            LaunchedEffect(discharging) {
+                val prev = previousDischarging
+                previousDischarging = discharging
+                if (prev != null && prev != discharging) {
+                    markInteraction()
+                }
+            }
+            var clockIdle by remember { mutableStateOf(false) }
+            var clockBlank by remember { mutableStateOf(false) }
+            LaunchedEffect(
+                lastInteractionAt,
+                brightUntil,
+                showSettings,
+                unlockSliderVisible,
+                activityResumed,
+                settings.blankWhenIdleDischarging,
+                settings.blankIdleDelaySec,
+                battery.isCharging,
+                battery.isPlugged,
+                batteryKnown,
+            ) {
+                while (true) {
+                    val now = System.currentTimeMillis()
+                    val state = IdleDisplayPolicy.evaluate(
+                        now = now,
+                        lastInteractionAt = lastInteractionAt,
+                        brightUntil = brightUntil,
+                        blankEnabled = settings.blankWhenIdleDischarging,
+                        blankDelaySec = settings.blankIdleDelaySec,
+                        isCharging = battery.isCharging,
+                        isPlugged = battery.isPlugged,
+                        batteryKnown = batteryKnown,
+                        overlayVisible = showSettings || unlockSliderVisible || !activityResumed,
+                    )
+                    clockIdle = state.idle
+                    clockBlank = state.blank
+                    val next = state.nextChangeAt ?: break
+                    delay((next - now).coerceAtLeast(1L))
+                }
+            }
+
             // Exit on unplug — falling edge only (plugged → unplugged).
             // Do NOT exit merely because the app started while already unplugged.
             var previousPlugged by remember { mutableStateOf<Boolean?>(null) }
@@ -248,6 +303,13 @@ class MainActivity : AppCompatActivity() {
                             settings = settings,
                             batteryPercent = battery.percent,
                             isCharging = battery.isCharging,
+                            idle = clockIdle,
+                            blank = clockBlank,
+                            onWakeFromBlank = {
+                                // Wake only + normal 5 s brighten; ClockScreen refreshes time.
+                                clockBlank = false
+                                markInteraction(brightenMs = 5_000L)
+                            },
                             onSingleTap = {
                                 markInteraction(brightenMs = 5_000L)
                             },
@@ -258,7 +320,9 @@ class MainActivity : AppCompatActivity() {
                                 showSettings = true
                             },
                             onUnlockSliderVisibilityChange = { visible ->
-                                if (visible) markInteraction()
+                                // Showing or hiding the slider both restart the idle countdown,
+                                // so the clock does not go black right after the slider closes.
+                                markInteraction()
                                 unlockSliderVisible = visible
                             },
                         )

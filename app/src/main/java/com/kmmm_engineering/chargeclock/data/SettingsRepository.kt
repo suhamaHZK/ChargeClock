@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import com.kmmm_engineering.chargeclock.discord.ThresholdAlertSnapshot
+import com.kmmm_engineering.chargeclock.ui.IdleDisplayPolicy
 import com.kmmm_engineering.chargeclock.widget.ClockWidgetUpdater
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -41,6 +42,10 @@ class SettingsRepository(private val context: Context) {
         val allowAutoSleep = booleanPreferencesKey("allow_auto_sleep")
         /** Persisted as first_run_hint_seen; means settings opened at least once. */
         val settingsOpenedOnce = booleanPreferencesKey("first_run_hint_seen")
+        val blankWhenIdleDischarging = booleanPreferencesKey("blank_when_idle_discharging")
+        /** Int seconds: 0 (immediately), 60, 120, 180, 300, 600. */
+        val blankIdleDelaySec = intPreferencesKey("blank_idle_delay_sec")
+        val hideSecondsWhenIdle = booleanPreferencesKey("hide_seconds_when_idle")
         // Discord threshold-cross persistence (survives process death)
         val alertLastPercent = intPreferencesKey("alert_last_percent")
         val alertLastCharging = booleanPreferencesKey("alert_last_charging")
@@ -103,6 +108,11 @@ class SettingsRepository(private val context: Context) {
         exitOnUnplug = prefs[Keys.exitOnUnplug] ?: false,
         allowAutoSleep = prefs[Keys.allowAutoSleep] ?: false,
         settingsOpenedOnce = prefs[Keys.settingsOpenedOnce] ?: false,
+        blankWhenIdleDischarging = prefs[Keys.blankWhenIdleDischarging] ?: false,
+        blankIdleDelaySec = IdleDisplayPolicy.normalizeBlankDelaySec(
+            prefs[Keys.blankIdleDelaySec] ?: IdleDisplayPolicy.DEFAULT_BLANK_DELAY_SEC,
+        ),
+        hideSecondsWhenIdle = prefs[Keys.hideSecondsWhenIdle] ?: false,
     )
 
     val settingsFlow: Flow<UserSettings> = context.dataStore.data.map { prefs ->
@@ -134,6 +144,9 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.exitOnUnplug] = next.exitOnUnplug
             prefs[Keys.allowAutoSleep] = next.allowAutoSleep
             prefs[Keys.settingsOpenedOnce] = next.settingsOpenedOnce
+            prefs[Keys.blankWhenIdleDischarging] = next.blankWhenIdleDischarging
+            prefs[Keys.blankIdleDelaySec] = IdleDisplayPolicy.normalizeBlankDelaySec(next.blankIdleDelaySec)
+            prefs[Keys.hideSecondsWhenIdle] = next.hideSecondsWhenIdle
         }
         ClockWidgetUpdater.updateAll(context.applicationContext)
     }
@@ -154,6 +167,9 @@ class SettingsRepository(private val context: Context) {
     suspend fun setClockTheme(v: ClockTheme) = update { it.copy(clockTheme = v) }
     suspend fun setExitOnUnplug(v: Boolean) = update { it.copy(exitOnUnplug = v) }
     suspend fun setAllowAutoSleep(v: Boolean) = update { it.copy(allowAutoSleep = v) }
+    suspend fun setBlankWhenIdleDischarging(v: Boolean) = update { it.copy(blankWhenIdleDischarging = v) }
+    suspend fun setBlankIdleDelaySec(v: Int) = update { it.copy(blankIdleDelaySec = v) }
+    suspend fun setHideSecondsWhenIdle(v: Boolean) = update { it.copy(hideSecondsWhenIdle = v) }
     suspend fun markSettingsOpenedOnce() = update { it.copy(settingsOpenedOnce = true) }
 
     suspend fun loadThresholdAlertSnapshot(): ThresholdAlertSnapshot {

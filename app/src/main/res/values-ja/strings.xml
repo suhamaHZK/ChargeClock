@@ -43,6 +43,13 @@
     <string name="weekday_cn">周一,周二,…</string>
     <string name="exit_on_unplug">充電器を外したら自動終了</string>
     <string name="allow_auto_sleep">起動中の自動スリープ</string>
+    <string name="hide_seconds_when_idle">待機時は秒を隠す</string>
+    <string name="hide_seconds_when_idle_desc">タップ後5秒間は秒を表示し、その後は秒を隠して1分ごとに更新します。</string>
+    <string name="blank_when_idle_discharging">放電中待機時は真っ黒にする</string>
+    <string name="blank_when_idle_discharging_desc">有機EL向け。充電していないとき、操作しないまま指定時間が経つと画面を真っ黒にします。1回タップすると時計に戻ります。</string>
+    <string name="blank_idle_delay">真っ黒にするまでの時間</string>
+    <string name="blank_delay_immediately">すぐ</string>
+    <string name="blank_delay_minutes">%1$d分</string>
     <string name="on">オン</string>
     <string name="off">オフ</string>
     <string name="back">戻る</string>
